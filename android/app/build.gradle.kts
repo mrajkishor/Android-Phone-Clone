@@ -1,11 +1,26 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release signing. The upload key and its passwords live in android/key.properties,
+// which is NEVER committed (see .gitignore). Without it, release builds fall back to
+// the debug key, which is fine for sideloading but rejected by Google Play.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasUploadKey = keystorePropertiesFile.exists()
+if (hasUploadKey) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+} else {
+    logger.warn("android/key.properties not found: release build will be signed with the DEBUG key (not accepted by Google Play).")
+}
+
 android {
-    namespace = "com.example.phone_transfer"
+    namespace = "com.mrajkishor.phoneclone"
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
@@ -15,25 +30,30 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.phone_transfer"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // Permanent Google Play identity of the app. Never change it after the first upload.
+        applicationId = "com.mrajkishor.phoneclone"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
+        // Google Play requires API 36 for new apps and updates from 31 Aug 2026.
+        targetSdk = 36
+        // Taken from `version:` in pubspec.yaml (name+code).
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("upload") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasUploadKey) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
         }
     }
 }

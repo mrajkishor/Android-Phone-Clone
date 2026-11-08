@@ -1,4 +1,4 @@
-package com.example.phone_transfer
+package com.mrajkishor.phoneclone
 
 import android.app.Activity
 import android.app.Application

@@ -1,4 +1,4 @@
-package com.example.phone_transfer
+package com.mrajkishor.phoneclone
 
 import android.content.Context
 import android.media.MediaScannerConnection
@@ -67,7 +67,7 @@ class NativeBridge(private val ctx: Context) {
                         try {
                             TransferService.start(
                                 ctx,
-                                call.argument<String>("title") ?: "Phone Transfer",
+                                call.argument<String>("title") ?: "Phone Clone",
                                 call.argument<String>("text") ?: "",
                                 call.argument<Boolean>("sending") ?: true
                             )

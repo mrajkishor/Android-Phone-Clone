@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 9 84 84"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F86FF"/><stop offset="1" stop-color="#0B4FC4"/></linearGradient></defs><rect x="12" y="9" width="84" height="84" rx="19" fill="url(#g)"/>
+  <!-- old phone (faded) -->
+  <rect x="27" y="36" width="21" height="40" rx="4.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="3"/>
+  <rect x="33.5" y="69" width="8" height="2.2" rx="1.1" fill="#FFFFFF" fill-opacity="0.6"/>
+  <!-- new phone -->
+  <rect x="60" y="36" width="21" height="40" rx="4.5" fill="#FFFFFF"/>
+  <rect x="64" y="43" width="13" height="3" rx="1.5" fill="#1B6EF3"/>
+  <rect x="64" y="49" width="10" height="3" rx="1.5" fill="#1B6EF3" fill-opacity="0.7"/>
+  <rect x="64" y="55" width="12" height="3" rx="1.5" fill="#1B6EF3" fill-opacity="0.45"/>
+  <!-- transfer arc + arrow head -->
+  <path d="M38 31 Q54 17 69 30" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M63.5 29.6 L70.6 31.4 L68.4 24.4" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -63,7 +63,7 @@ class _PermissionGateState extends State<PermissionGate> with WidgetsBindingObse
           Text(widget.reason, textAlign: TextAlign.center),
           const SizedBox(height: 8),
           Text(
-            'On the next screen, turn on “Allow access to manage all files” for Phone Transfer, then come back.',
+            'On the next screen, turn on “Allow access to manage all files” for Phone Clone, then come back.',
             textAlign: TextAlign.center,
             style: t.bodySmall,
           ),

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2F86FF"/><stop offset="1" stop-color="#0B4FC4"/></linearGradient></defs>
+  <rect width="1024" height="500" fill="url(#g)"/>
+  <g transform="translate(40,70) scale(3.3)">
+  <!-- old phone (faded) -->
+  <rect x="27" y="36" width="21" height="40" rx="4.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="3"/>
+  <rect x="33.5" y="69" width="8" height="2.2" rx="1.1" fill="#FFFFFF" fill-opacity="0.6"/>
+  <!-- new phone -->
+  <rect x="60" y="36" width="21" height="40" rx="4.5" fill="#FFFFFF"/>
+  <rect x="64" y="43" width="13" height="3" rx="1.5" fill="#1B6EF3"/>
+  <rect x="64" y="49" width="10" height="3" rx="1.5" fill="#1B6EF3" fill-opacity="0.7"/>
+  <rect x="64" y="55" width="12" height="3" rx="1.5" fill="#1B6EF3" fill-opacity="0.45"/>
+  <!-- transfer arc + arrow head -->
+  <path d="M38 31 Q54 17 69 30" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M63.5 29.6 L70.6 31.4 L68.4 24.4" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="430" y="200" font-family="Inter" font-weight="700" font-size="76" fill="#FFFFFF">Phone Clone</text>
+  <text x="432" y="262" font-family="Inter" font-weight="500" font-size="30" fill="#FFFFFF" fill-opacity="0.92">Move everything to your new phone</text>
+  <text x="432" y="304" font-family="Inter" font-weight="500" font-size="30" fill="#FFFFFF" fill-opacity="0.92">over Wi-Fi. Fast, verified, no duplicates.</text>
+  <g font-family="Inter" font-weight="600" font-size="22" fill="#0B4FC4">
+    <rect x="432" y="342" width="132" height="40" rx="20" fill="#FFFFFF"/><text x="498" y="369" text-anchor="middle">No cloud</text>
+    <rect x="576" y="342" width="160" height="40" rx="20" fill="#FFFFFF"/><text x="656" y="369" text-anchor="middle">SHA-256 ✓</text>
+    <rect x="748" y="342" width="196" height="40" rx="20" fill="#FFFFFF"/><text x="846" y="369" text-anchor="middle">Pause &amp; resume</text>
+  </g>
+</svg>

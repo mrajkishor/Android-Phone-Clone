@@ -1,4 +1,4 @@
-package com.example.phone_transfer
+package com.mrajkishor.phoneclone
 
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
@@ -94,7 +94,7 @@ class TransferService : Service() {
         ensureChannel(this)
         val notification = build(
             this,
-            intent?.getStringExtra("title") ?: "Phone Transfer",
+            intent?.getStringExtra("title") ?: "Phone Clone",
             intent?.getStringExtra("text") ?: "",
             -1
         )
