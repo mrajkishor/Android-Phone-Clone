@@ -1018,24 +1018,29 @@ class SenderService extends ChangeNotifier {
         case Extra.calls:
           t.total = scan?.calls ?? 0;
           await _sendPages('readCalls', '/x/calls', 500, t);
+          t.total = t.added + t.existing + t.failed; // what was actually read, as the new phone counts it
         case Extra.messages:
           t.total = (scan?.sms ?? 0) + (scan?.mms ?? 0);
           await _sendPages('readSms', '/x/sms', 500, t);
           await _sendPages('readMms', '/x/mms', 20, t); // pictures make MMS pages heavy
           await _requestReliably('POST', '/x/messages-done', body: {});
+          t.total = t.added + t.existing + t.failed;
         case Extra.apps:
+          // Every app goes to the new phone, which checks which installers it has and
+          // which apps are already installed there. Both phones then show its answer.
           final apps = scan?.apps ?? const <AppInfo>[];
-          final arrived = [
-            for (final a in apps)
-              if (a.files.every((f) => outcomes[f.key]?.onNewPhone ?? false)) a,
-          ];
-          t.total = apps.length;
-          await _requestReliably('POST', '/x/apps', body: {'apps': [for (final a in arrived) a.toJson()]});
-          t.added = arrived.length;
-          t.failed = apps.length - arrived.length;
+          t
+            ..total = apps.length
+            ..added = 0
+            ..existing = 0
+            ..failed = 0;
+          final r = await _requestReliably('POST', '/x/apps', body: {'apps': [for (final a in apps) a.toJson()]});
+          if (r is Map) t.absorb(r);
           t.note = t.failed > 0
-              ? 'Ready to install on the new phone (Extras tab). ${t.failed} didn’t finish copying: use “Try the failed files again” on the Progress tab.'
-              : 'Ready to install: open the Extras tab on the new phone and tap Install.';
+              ? '${t.failed} didn’t finish copying: use “Try the failed files again” on the Progress tab, then Try again here.'
+              : t.added > 0
+                  ? 'Open the Extras tab on the new phone and tap Install.'
+                  : null;
         case Extra.wallpaper:
           for (final lock in [false, true]) {
             final bytes = await NativeExtras.readWallpaper(lock: lock);
@@ -1096,8 +1101,9 @@ class SenderService extends ChangeNotifier {
       req.contentLength = bytes.length;
       req.add(bytes);
       final res = await req.close().timeout(const Duration(seconds: 60));
-      await res.drain<void>();
-      return res.statusCode == 200;
+      final text = await utf8.decodeStream(res);
+      // The new phone says whether it could actually set it.
+      return res.statusCode == 200 && (jsonDecode(text) as Map)['ok'] == true;
     } catch (_) {
       return false;
     }

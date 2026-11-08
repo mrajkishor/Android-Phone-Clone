@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.4.1](#541--2026-11-09) | Preview fix: both phones always show the same Extras numbers | 5 | ✅ | ~20 min |
 | [5.4.0](#540--2026-11-09) | Preview: tap a file to open it; open folders in the Files app | 5 | ✅ | ~15 min |
 | [5.3.0](#530--2026-11-09) | Preview: "Last transfer" on the home screen; new phone lists files already there; correct version in the app | 5 | ✅ | ~25 min |
 | [5.2.0](#520--2026-11-08) | Thumbnails and app names in Files; Extras that agree on both phones, with Try again | 5 | ✅ | ~30 min |
@@ -20,6 +21,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 > v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [5.4.1] — 2026-11-09 *(preview, restricted access)*
+
+### Fixed
+- **Installed apps: the two phones disagreed** (one said all added, the other said they couldn't be added). Once the new phone's app had been closed or reinstalled, it no longer remembered where the app installers from an earlier transfer were, even though they were on disk.
+  - The new phone now finds them on disk.
+  - **It decides** which apps are ready to install, already installed (same or newer version) or not copied, and the old phone shows exactly its answer.
+  - The card now says *"93 ready to install · 4 already installed · 2 not copied"*.
+- **Ringtones** used the same lookup, so they're fixed the same way.
+- **Wallpaper** on the old phone counted as set even when the new phone couldn't set it. It now uses the new phone's answer.
+- Call history and messages: the old phone's total is now what was actually read, so both phones show the same totals.
+- The test now restarts the new phone between transfers and checks that both phones show identical numbers for every extra (**16 tests**).
 
 ## [5.4.0] — 2026-11-09 *(preview, restricted access)*
 

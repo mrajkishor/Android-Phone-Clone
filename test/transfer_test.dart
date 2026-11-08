@@ -554,7 +554,7 @@ void main() {
       return null;
     });
 
-    final r = await startReceiver();
+    var r = await startReceiver();
     // The new phone asks before restoring messages (default-SMS role). The user first
     // taps "Skip", then changes their mind and taps "Try again" on the old phone.
     final asked = <Extra>[];
@@ -567,7 +567,7 @@ void main() {
         r.answerPrompt(e, asked.length > 1).whenComplete(() => answering = false);
       }
     });
-    final (s, base) = await prepareSender(r);
+    var (s, base) = await prepareSender(r);
     currentRoot = oldRoot.path;
     final x = await ExtrasScan.scan([oldRoot.path]);
     expect(x.count(Extra.messages), 2);
@@ -620,8 +620,38 @@ void main() {
     await s.run(plan);
     expect(s.outcomes.values.map((o) => o.status).toSet(), {'already'});
     expect(r.sessionFiles, hasLength(plan.files.length), reason: 'the new phone lists them too');
+    // Files already there from the first run still count: apps are ready to install, and
+    // both phones show exactly the same numbers for every extra.
+    expect(r.apps, hasLength(1));
+    expect(r.extraTally[Extra.apps]!.added, 1);
+    for (final e in Extra.values) {
+      final a = s.extraTally[e]!, b = r.extraTally[e]!;
+      expect([a.added, a.existing, a.failed, a.state], [b.added, b.existing, b.failed, b.state], reason: '$e');
+    }
     expect(r.sessionFiles.map((f) => f.status).toSet(), {'already'});
     expect(r.sessionFiles.every((f) => File(f.path).existsSync()), isTrue, reason: 'with their place on this phone');
+
+    // The new phone's app was closed and opened again (or reinstalled): files from before
+    // are found on disk, so the apps are still ready to install and both phones agree.
+    s.dispose();
+    await r.stop();
+    r = await startReceiver();
+    r.addListener(() {
+      final e = r.pendingPrompt;
+      if (e != null && !answering) {
+        answering = true;
+        r.answerPrompt(e, true).whenComplete(() => answering = false);
+      }
+    });
+    s = (await prepareSender(r)).$1;
+    await s.run(plan);
+    expect(s.phase, SendPhase.done);
+    expect(r.apps, hasLength(1), reason: 'installer found on disk from the earlier transfer');
+    for (final e in Extra.values) {
+      final a = s.extraTally[e]!, b = r.extraTally[e]!;
+      expect([a.added, a.existing, a.failed, a.state], [b.added, b.existing, b.failed, b.state], reason: '$e after restart');
+    }
+    expect(ringtones.last, p.join(newRoot.path, 'Music/song.mp3'), reason: 'ringtone file found on disk too');
 
     // A new phone that is still on v4 just skips the extras.
     s.dispose();

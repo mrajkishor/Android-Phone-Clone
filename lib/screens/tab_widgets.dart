@@ -526,7 +526,7 @@ class ExtrasStatusList extends StatelessWidget {
         ),
       'done' when t.failed > 0 => (
           const Icon(Icons.error_outline, color: Colors.orange),
-          'Done, but ${t.failed} couldn’t be added'
+          'Done, but ${t.failed} couldn’t be ${e == Extra.apps ? 'copied' : 'added'}'
         ),
       'done' => (const Icon(Icons.check_circle, color: Colors.green), 'Done'),
       'skipped' => (Icon(Icons.do_not_disturb_on_outlined, color: cs.outline), 'Skipped'),
@@ -536,10 +536,11 @@ class ExtrasStatusList extends StatelessWidget {
         ),
     };
 
+    final apps = e == Extra.apps;
     final numbers = [
-      if (t.added > 0 || t.state == 'done') '${t.added} added',
-      if (t.existing > 0) '${t.existing} already there',
-      if (t.failed > 0) '${t.failed} not added',
+      if (t.added > 0 || t.state == 'done') apps ? '${t.added} ready to install' : '${t.added} added',
+      if (t.existing > 0) apps ? '${t.existing} already installed' : '${t.existing} already there',
+      if (t.failed > 0) apps ? '${t.failed} not copied' : '${t.failed} not added',
     ].join(' · ');
 
     return Card(

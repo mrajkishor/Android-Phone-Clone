@@ -527,6 +527,7 @@ class ReceiverService extends ChangeNotifier {
             final rel = key.substring(0, key.lastIndexOf('|', key.lastIndexOf('|') - 1));
             final cat = Category.values.where((c) => c.name == i['cat']).firstOrNull ?? Category.otherFiles;
             _checkedAlready[key] = SessionFile(rel, size, 'already', cat, path);
+            _pathByRel[rel] = path; // apps and ringtones look their files up by this
           }
           reply = {'present': present};
         case '/hello':
@@ -597,7 +598,7 @@ class ReceiverService extends ChangeNotifier {
           smsRoleToHandBack = await NativeExtras.isDefaultSmsApp();
           reply = {'ok': true};
         case '/x/apps' when v5:
-          reply = _receiveApps(((await _json(req) as Map)['apps'] as List).cast<Map>());
+          reply = await _receiveApps(((await _json(req) as Map)['apps'] as List).cast<Map>());
         case '/x/wallpaper' when v5:
           reply = await _receiveWallpaper(req);
         case '/x/ringtones' when v5:
@@ -1104,35 +1105,48 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
-  Map<String, dynamic> _receiveApps(List<Map> list) {
+  /// Where a file from the old phone is on this phone: received now, or already here before.
+  String? _localPath(String rel) {
+    final known = _pathByRel[rel];
+    if (known != null && File(known).existsSync()) return known;
+    final safe = _safeRel(rel);
+    for (final path in [p.join(_root.path, safe), p.join(_root.path, 'PhoneTransfer', safe)]) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
+  }
+
+  /// This phone decides, and both phones show the same numbers:
+  /// added = ready to install, existing = already installed (same or newer), failed = files missing.
+  Future<Map<String, dynamic>> _receiveApps(List<Map> list) async {
     apps.clear();
+    var ready = 0, installed = 0, missing = 0;
     for (final a in list) {
-      final paths = [
-        for (final rel in (a['files'] as List).cast<String>())
-          if (_pathByRel[rel] != null) _pathByRel[rel]!,
-      ];
-      if (paths.isEmpty) continue;
-      apps.add(ReceivedApp(a['package'] as String, a['label'] as String? ?? a['package'] as String,
-          a['versionName'] as String?, (a['versionCode'] as num? ?? 0).toInt(), a['fromPlay'] == true, paths));
+      final rels = (a['files'] as List).cast<String>();
+      final paths = [for (final rel in rels) _localPath(rel)];
+      if (paths.isEmpty || paths.any((x) => x == null)) {
+        missing++;
+        continue;
+      }
+      final app = ReceivedApp(a['package'] as String, a['label'] as String? ?? a['package'] as String,
+          a['versionName'] as String?, (a['versionCode'] as num? ?? 0).toInt(), a['fromPlay'] == true,
+          paths.cast<String>());
+      try {
+        final v = await NativeExtras.installedVersion(app.package);
+        if (v >= 0 && v >= app.versionCode) app.state = 'installed';
+      } catch (_) {}
+      app.state == 'installed' ? installed++ : ready++;
+      apps.add(app);
     }
     extraTally[Extra.apps]!
       ..total = list.length
-      ..added = apps.length
-      ..failed = list.length - apps.length
+      ..added = ready
+      ..existing = installed
+      ..failed = missing
       ..state = 'done'
-      ..note = 'Tap Install in the Extras tab';
-    _refreshInstalled();
-    return {'added': apps.length, 'existing': 0, 'failed': list.length - apps.length};
-  }
-
-  Future<void> _refreshInstalled() async {
-    for (final a in apps) {
-      try {
-        final v = await NativeExtras.installedVersion(a.package);
-        if (v >= a.versionCode && v >= 0) a.state = 'installed';
-      } catch (_) {}
-    }
+      ..note = ready > 0 ? 'Tap Install below for the apps you want.' : null;
     _tick(force: true);
+    return {'added': ready, 'existing': installed, 'failed': missing};
   }
 
   /// Installs one received app (Android asks the user to confirm).
@@ -1183,7 +1197,7 @@ class ReceiverService extends ChangeNotifier {
       try {
         final rel = r['rel'] as String?;
         final ok = await NativeExtras.setRingtone(
-            r['type'] as String, rel == null ? null : _pathByRel[rel], r['title'] as String?);
+            r['type'] as String, rel == null ? null : _localPath(rel), r['title'] as String?);
         ok ? t.added++ : t.failed++;
       } catch (_) {
         t.failed++;
