@@ -1,0 +1,47 @@
+# Publishes a GitHub Release for every docs/release-notes/vX.Y.Z.md file,
+# attaching the matching APK from apk/PhoneTransfer-vX.Y.Z.apk.
+# Runs on push to main (when release notes or APKs change) or manually.
+name: Publish release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/release-notes/**"
+      - "apk/**"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create missing releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          latest=$(ls docs/release-notes/v*.md | sed 's#.*/##; s#\.md$##' | sort -V | tail -1)
+          for notes in docs/release-notes/v*.md; do
+            tag=$(basename "$notes" .md)
+            apk="apk/PhoneTransfer-${tag}.apk"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "Release $tag already exists — skipping"
+              continue
+            fi
+            title="$tag"
+            case "$tag" in v3.0.0) title="v3.0.0 — Unstoppable" ;; esac
+            args=(--target "$GITHUB_SHA" --title "$title" --notes-file "$notes")
+            [ "$tag" = "$latest" ] && args+=(--latest)
+            if [ -f "$apk" ]; then
+              gh release create "$tag" "$apk" "${args[@]}"
+            else
+              gh release create "$tag" "${args[@]}"
+            fi
+            echo "Published $tag"
+          done
