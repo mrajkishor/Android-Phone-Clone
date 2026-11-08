@@ -12,6 +12,7 @@ import 'package:phone_transfer/transfer/extras.dart';
 import 'package:phone_transfer/transfer/protocol.dart';
 import 'package:phone_transfer/transfer/receiver.dart';
 import 'package:phone_transfer/transfer/scanner.dart';
+import 'package:phone_transfer/transfer/session_store.dart';
 import 'package:phone_transfer/transfer/sender.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -608,6 +609,13 @@ void main() {
     expect(s.outcomes.values.every((o) => o.onNewPhone), isTrue, reason: '${s.outcomes.values.map((o) => o.status)}');
     expect(r.sessionFiles.map((f) => f.rel).toSet(), {for (final f in plan.files) f.rel});
 
+    // The new phone keeps a report for the home screen's "Last transfer" card.
+    final report = await TransferReport.load();
+    expect(report, isNotNull);
+    expect(report!.sent, isFalse);
+    expect(report.files, hasLength(plan.files.length));
+    expect(report.onNewPhone, plan.files.length);
+
     // Again: nothing new; the Files tab shows "already there".
     await s.run(plan);
     expect(s.outcomes.values.map((o) => o.status).toSet(), {'already'});
@@ -661,5 +669,11 @@ void main() {
     await tester.pump();
     expect(find.text('com.app'), findsOneWidget, reason: 'single group opens by itself');
     expect(tester.takeException(), isNull);
+  });
+
+  test('the version shown in the app matches pubspec.yaml', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final v = RegExp(r'^version: ([^+\s]+)', multiLine: true).firstMatch(pubspec)!.group(1);
+    expect(kAppVersion, v);
   });
 }

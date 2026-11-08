@@ -54,3 +54,75 @@ class LastSession {
     } catch (_) {}
   }
 }
+
+/// One file in the saved report of the last transfer.
+class ReportFile {
+  final String rel;
+  final int size;
+  final String status; // sent | saved | already | cloned | waiting | queued | failed | restricted
+  final String? category; // Category.name, null for restricted
+  final String? path; // where it is on this phone
+  final String? error;
+  const ReportFile(this.rel, this.size, this.status, {this.category, this.path, this.error});
+
+  Map<String, dynamic> toJson() => {
+        'r': rel,
+        's': size,
+        't': status,
+        if (category != null) 'c': category,
+        if (path != null) 'p': path,
+        if (error != null) 'e': error,
+      };
+
+  static ReportFile fromJson(Map m) => ReportFile(m['r'] as String, m['s'] as int, m['t'] as String,
+      category: m['c'] as String?, path: m['p'] as String?, error: m['e'] as String?);
+}
+
+/// What the last transfer did, kept on each phone so the home screen can show it
+/// after the phones are no longer connected. Replaced by the next transfer.
+class TransferReport {
+  final bool sent; // true on the old phone
+  final DateTime when;
+  final String outcome; // done | stopped | interrupted
+  final List<ReportFile> files;
+
+  const TransferReport(this.sent, this.when, this.outcome, this.files);
+
+  int get onNewPhone => files.where((f) => const {'sent', 'saved', 'already', 'cloned'}.contains(f.status)).length;
+  int get failed => files.where((f) => f.status == 'failed').length;
+  int get bytes => files.fold(0, (s, f) => s + f.size);
+
+  static Future<File> _file() async =>
+      File(p.join((await getApplicationSupportDirectory()).path, 'last_report.json'));
+
+  static Future<TransferReport?> load() async {
+    try {
+      final m = jsonDecode(await (await _file()).readAsString()) as Map;
+      return TransferReport(
+        m['sent'] as bool,
+        DateTime.fromMillisecondsSinceEpoch(m['when'] as int),
+        m['outcome'] as String,
+        [for (final f in (m['files'] as List).cast<Map>()) ReportFile.fromJson(f)],
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> save() async {
+    try {
+      await (await _file()).writeAsString(jsonEncode({
+        'sent': sent,
+        'when': when.millisecondsSinceEpoch,
+        'outcome': outcome,
+        'files': [for (final f in files.take(60000)) f.toJson()],
+      }));
+    } catch (_) {}
+  }
+
+  static Future<void> clear() async {
+    try {
+      await (await _file()).delete();
+    } catch (_) {}
+  }
+}

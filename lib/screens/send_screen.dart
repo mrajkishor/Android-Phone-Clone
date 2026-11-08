@@ -186,10 +186,25 @@ class _SendBodyState extends State<_SendBody> {
     // Remember this transfer so it can be continued after a restart or an app update.
     await LastSession(s.pairing, Set.of(_selected), _sendContacts, DateTime.now()).save();
     await s.run(_plan!);
+    await _saveReport(s);
     if (s.phase == SendPhase.done && s.failedItems.isEmpty && s.contactsFailed == 0) {
       await LastSession.clear();
     }
   }
+
+  /// Kept for the home screen's "Last transfer" card.
+  Future<void> _saveReport(SenderService s) => TransferReport(
+        true,
+        DateTime.now(),
+        switch (s.phase) { SendPhase.done => 'done', SendPhase.cancelled => 'stopped', _ => 'interrupted' },
+        [
+          for (final o in s.outcomes.values)
+            ReportFile(o.file.rel, o.file.size, o.status,
+                category: o.file.category.name, path: o.file.path, error: o.error),
+          for (final x in _scan?.restricted ?? const <RestrictedItem>[])
+            ReportFile(x.rel, 0, 'restricted', error: x.reason),
+        ],
+      ).save();
 
   Future<void> _confirmStop() async {
     final ok = await showDialog<bool>(

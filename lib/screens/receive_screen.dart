@@ -494,6 +494,14 @@ class _DoneView extends StatelessWidget {
             if (s.extraTally[e]!.state != 'pending')
               (e.label, s.extraTally[e]!.added, s.extraTally[e]!.existing, s.extraTally[e]!.failed),
         ]),
+        if (s.tally[Category.photos]!.saved + s.tally[Category.videos]!.saved + s.tally[Category.otherMedia]!.saved > 0)
+          const ListTile(
+            leading: Icon(Icons.photo_library_outlined),
+            title: Text('Your albums are here too'),
+            subtitle: Text('Photos and videos are in the same folders as on the old phone. '
+                'In Google Photos, open Collections → On this device to see each folder as an album.'),
+            isThreeLine: true,
+          ),
         if (s.alreadyBeforeStart > 0)
           Padding(
             padding: const EdgeInsets.only(top: 8),

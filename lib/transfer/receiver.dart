@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart' as ph;
 import 'extras.dart';
 import 'native.dart';
 import 'protocol.dart';
+import 'session_store.dart';
 
 enum ReceivePhase { starting, waiting, receiving, done, error }
 
@@ -320,6 +321,8 @@ class ReceiverService extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    // Leaving the screen in the middle of a transfer: keep what arrived for the home screen.
+    if (phase == ReceivePhase.receiving && sessionFiles.isNotEmpty) await _saveReport('interrupted');
     _notifyTimer?.cancel();
     _addressTimer?.cancel();
     _scanTimer?.cancel();
@@ -620,6 +623,7 @@ class ReceiverService extends ChangeNotifier {
           }
           pendingPrompt = null;
           phase = ReceivePhase.done;
+          await _saveReport(complete ? 'done' : (senderCancelled ? 'stopped' : 'interrupted'));
           _activeTransfer = null; // the next transfer may start
           inFlight.clear();
           _updateNotification();
@@ -961,6 +965,13 @@ class ReceiverService extends ChangeNotifier {
       if (!await candidate.exists()) return candidate;
     }
   }
+
+  /// Kept for the home screen's "Last transfer" card.
+  Future<void> _saveReport(String outcome) => TransferReport(false, DateTime.now(), outcome, [
+        for (final f in sessionFiles)
+          ReportFile(f.rel, f.size, f.status, category: f.category.name, path: f.path),
+        for (final f in finalFailures) ReportFile('${f['rel']}', 0, 'failed', error: '${f['error']}'),
+      ]).save();
 
   void _noteFile(String rel, String path, int size, String status, Category category) {
     _pathByRel[rel] = path;

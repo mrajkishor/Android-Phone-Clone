@@ -13,6 +13,9 @@ const int kDefaultPort = 8765;
 /// talks to v3 phones in either direction (falling back to v3 behaviour).
 const int kProtocolVersion = 5;
 
+/// Shown in the app. Must match `version:` in pubspec.yaml (a test checks it).
+const String kAppVersion = '5.3.0';
+
 /// Oldest protocol this app can still talk to.
 const int kMinProtocolVersion = 3;
 

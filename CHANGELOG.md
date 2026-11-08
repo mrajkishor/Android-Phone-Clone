@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
-| [5.2.1](#521--2026-11-08) | Preview fix: new phone's Files tab lists files already there | 5 | ✅ | ~10 min |
+| [5.3.0](#530--2026-11-09) | Preview: "Last transfer" on the home screen; new phone lists files already there; correct version in the app | 5 | ✅ | ~25 min |
 | [5.2.0](#520--2026-11-08) | Thumbnails and app names in Files; Extras that agree on both phones, with Try again | 5 | ✅ | ~30 min |
 | [5.1.0](#510--2026-11-08) | Never re-sends what's already there; grouped Files tab; restricted items marked | 5 | ✅ | ~25 min |
 | [5.0.0](#500--2026-11-08) | Everything: messages, call history, calendar, apps, wallpaper, ringtones; Files and Extras tabs | 5 (talks 3–4) | ✅ over 4.1+ (Phone Clone) | ~45 min |
@@ -20,10 +20,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [5.2.1] — 2026-11-08 *(preview, restricted access)*
+## [5.3.0] — 2026-11-09 *(preview, restricted access)*
+
+### Added
+- **"Last transfer" on the home screen**, on both phones. A card shows when it was, how it ended, and how many files and how much data. Tap it to open the same grouped Files view (type / folder / status, thumbnails, filters, search) without the phones being connected. *Clear list* removes only the list, never files. The next transfer replaces it.
+- **Albums tip** on the new phone when photos or videos arrived: folders are kept exactly as on the old phone, and Google Photos shows them under *Collections → On this device*.
 
 ### Fixed
 - **The new phone's Files tab looked empty** when the files were already there from an earlier transfer. Only files copied in the current transfer were listed. It now also lists every file found already there, as *Already there*, with its thumbnail. The old phone already showed both.
+- **The home screen showed v4.2.2.** It now shows the real version, and a test keeps it in step with `pubspec.yaml`.
+- 15 tests.
 
 ## [5.2.0] — 2026-11-08
 
