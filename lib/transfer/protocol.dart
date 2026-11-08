@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
@@ -7,8 +8,23 @@ import 'package:crypto/crypto.dart';
 /// Default port the new phone listens on.
 const int kDefaultPort = 8765;
 
-/// Bumped whenever the wire format changes. Both phones must run the same version.
-const int kProtocolVersion = 3;
+/// Bumped whenever the wire format changes.
+/// v4 adds parallel lanes, small-file batches and duplicate cloning, and still
+/// talks to v3 phones in either direction (falling back to v3 behaviour).
+const int kProtocolVersion = 4;
+
+/// Oldest protocol this app can still talk to.
+const int kMinProtocolVersion = 3;
+
+/// Files up to this size are sent together in batches.
+const int kBatchFileMax = 2 * 1024 * 1024;
+
+/// A batch closes at this many files or bytes, whichever comes first.
+const int kBatchMaxFiles = 300;
+const int kBatchMaxBytes = 32 * 1024 * 1024;
+
+/// Files at least this large, sharing a name and size, are checked for identical content.
+const int kDuplicateCheckMin = 64 * 1024;
 
 /// Groups shown on the old phone. Photos, videos and music are what Android's
 /// media index knows about; everything else is found by scanning storage.
@@ -62,12 +78,29 @@ class PairingInfo {
   final String host;
   final int port;
   final String code; // 6-digit pairing code, sent as X-Code on every request
-  final int version;
+  final int version; // highest protocol version the new phone speaks
 
   const PairingInfo({required this.host, required this.port, required this.code, this.version = kProtocolVersion});
 
-  String toQr() =>
-      jsonEncode({'app': 'phone_transfer', 'v': kProtocolVersion, 'host': host, 'port': port, 'code': code});
+  /// 'v' stays at the oldest compatible version so a v3 phone can still pair;
+  /// 'max' tells newer phones what this one can do.
+  String toQr() => jsonEncode({
+        'app': 'phone_transfer',
+        'v': kMinProtocolVersion,
+        'max': kProtocolVersion,
+        'host': host,
+        'port': port,
+        'code': code,
+      });
+
+  Map<String, dynamic> toJson() => {'host': host, 'port': port, 'code': code, 'version': version};
+
+  static PairingInfo fromJson(Map m) => PairingInfo(
+        host: m['host'] as String,
+        port: m['port'] as int,
+        code: m['code'] as String,
+        version: m['version'] as int? ?? kMinProtocolVersion,
+      );
 
   static PairingInfo? fromQr(String raw) {
     try {
@@ -77,7 +110,7 @@ class PairingInfo {
         host: m['host'] as String,
         port: m['port'] as int,
         code: m['code'] as String,
-        version: m['v'] as int? ?? 1,
+        version: m['max'] as int? ?? m['v'] as int? ?? 1,
       );
     } catch (_) {
       return null;
@@ -163,3 +196,26 @@ String formatDuration(Duration d) {
   if (d.inMinutes > 0) return '${d.inMinutes} min';
   return '${max(1, d.inSeconds)} s';
 }
+
+/// Reads [file] from [start] in large blocks (1 MB): fewer, bigger writes to the socket.
+Stream<List<int>> readInBlocks(File file, [int start = 0, int block = 1024 * 1024]) async* {
+  final raf = await file.open();
+  try {
+    await raf.setPosition(start);
+    while (true) {
+      final chunk = await raf.read(block);
+      if (chunk.isEmpty) break;
+      yield chunk;
+    }
+  } finally {
+    await raf.close();
+  }
+}
+
+/// SHA-256 of a whole file, computed in a background isolate so the UI thread stays free.
+Future<String> sha256InBackground(String path) => Isolate.run(() => sha256OfFile(File(path)));
+
+/// SHA-256 of several files in one background isolate.
+Future<List<String>> sha256ManyInBackground(List<String> paths) =>
+    Isolate.run(() async => [for (final p in paths) await sha256OfFile(File(p))]);
+

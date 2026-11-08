@@ -34,6 +34,20 @@ class RecentFile {
   const RecentFile(this.rel, this.size, this.alreadyThere);
 }
 
+/// What one parallel lane is sending right now.
+class LaneView {
+  String rel;
+  int bytes;
+  int total;
+  int resumedFrom;
+  final bool batch;
+  int batchIndex;
+  final int batchCount;
+
+  LaneView(this.rel, this.bytes, this.total,
+      {this.resumedFrom = 0, this.batch = false, this.batchIndex = 0, this.batchCount = 0});
+}
+
 class SendPlan {
   final List<FileEntry> files;
   final List<Contact> contacts;
@@ -76,8 +90,37 @@ class _FileFailure implements Exception {
   _FileFailure(this.message);
 }
 
+/// One request in flight, so Pause / Stop / the stall watchdog can abort it.
+class _Inflight {
+  final HttpClientRequest req;
+  DateTime lastProgress = DateTime.now();
+  Object? abortReason;
+  _Inflight(this.req);
+
+  void abort(Object reason) {
+    if (abortReason != null) return;
+    abortReason = reason;
+    req.abort(reason);
+  }
+}
+
+/// A unit of work for a lane: one large file, or a batch of small ones.
+class _Work {
+  final FileEntry? file;
+  final List<FileEntry>? batch;
+  const _Work.file(FileEntry this.file) : batch = null;
+  const _Work.batch(List<FileEntry> this.batch) : file = null;
+}
+
 /// Runs on the OLD phone. It only ever READS from this phone: there is no code
 /// here that deletes, moves or edits anything on it.
+///
+/// v4 speed-ups (used when the new phone also runs v4):
+/// * several lanes at once (2–6, adjusted automatically), lane 1 for large files
+/// * small files sent many-per-request
+/// * checksums computed in background isolates
+/// * identical content sent once and copied on the new phone
+/// With a v3 phone it falls back to v3 behaviour (one file at a time).
 class SenderService extends ChangeNotifier {
   // ---- tunables (tests use smaller values) ----
   /// A file with no progress for this long is skipped and queued for retry.
@@ -94,16 +137,26 @@ class SenderService extends ChangeNotifier {
     Duration(seconds: 40),
   ];
 
+  /// Parallel lanes: starts at [startLanes], adapts between [minLanes] and [maxLanes].
+  int minLanes = 2;
+  int startLanes = 3;
+  int maxLanes = 6;
+
   @visibleForTesting
   void Function(SenderService sender, FileEntry file, int fileBytes)? debugOnChunk;
 
   final PairingInfo pairing;
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 8)
-    ..idleTimeout = const Duration(seconds: 30);
+    ..idleTimeout = const Duration(seconds: 30)
+    ..maxConnectionsPerHost = 12;
   final Random _random = Random();
 
   SenderService(this.pairing);
+
+  /// Protocol the new phone speaks (set by [ping]). Below 4 = v3 mode.
+  int receiverVersion = kMinProtocolVersion;
+  bool get fastMode => receiverVersion >= 4;
 
   // ---- state shown on screen ----
   SendPhase phase = SendPhase.idle;
@@ -115,6 +168,7 @@ class SenderService extends ChangeNotifier {
   int retryRound = 0;
   int get retryRounds => maxAttempts - 1;
   Duration? nextRetryIn;
+  int targetLanes = 1;
 
   // Overall progress.
   int totalBytes = 0;
@@ -122,12 +176,16 @@ class SenderService extends ChangeNotifier {
   int filesToSend = 0;
   int filesProcessed = 0;
   int resumedBytes = 0; // bytes that didn't need re-sending thanks to resume
-  int get bytesDone => min(totalBytes, _completedBytes + currentFileBytes);
+  int clonedFiles = 0; // identical content copied on the new phone instead of sent
+  int clonedBytes = 0;
+  int batchesSent = 0;
+  int get bytesDone => min(totalBytes, _completedBytes + lanes.values.fold<int>(0, (s, l) => s + l.bytes));
 
-  // Current file, byte by byte.
-  FileEntry? currentFile;
-  int currentFileBytes = 0;
-  int currentFileResumedFrom = 0;
+  /// What each lane is sending right now.
+  final Map<int, LaneView> lanes = {};
+
+  // Kept for code that shows a single "current file".
+  LaneView? get currentLane => lanes.isEmpty ? null : lanes.values.first;
 
   final List<RecentFile> recent = [];
   final List<DlqItem> dlq = [];
@@ -144,15 +202,26 @@ class SenderService extends ChangeNotifier {
   // ---- internals ----
   bool _cancel = false;
   bool _paused = false;
+  bool _mainPass = false;
   Completer<void>? _resumeSignal;
-  HttpClientRequest? _activeReq;
-  Object? _abortReason;
-  DateTime _lastProgress = DateTime.now();
+  final Map<int, _Inflight> _inflight = {};
+  Future<void>? _reconnecting;
   DateTime _lastTick = DateTime(0);
   int _netBytes = 0;
   final List<(int, int)> _speedSamples = []; // (ms, netBytes)
   Timer? _heartbeat;
+  Timer? _watchdog;
+  Timer? _laneController;
   bool _heartbeatBusy = false;
+  int _seq = 0;
+  final String _session = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+
+  // Work queues for the lanes.
+  final List<_Work> _bigQueue = [];
+  final List<_Work> _batchQueue = [];
+  int _troubleSinceCheck = 0; // stalls / errors since the lane controller last looked
+  int _bytesAtLastCheck = 0;
+  double _rateAtLastCheck = 0;
 
   /// Bytes per second over the last few seconds.
   double get bytesPerSecond {
@@ -189,7 +258,9 @@ class SenderService extends ChangeNotifier {
     if (_paused || !_running) return;
     _paused = true;
     _resumeSignal = Completer<void>();
-    _abort(_PauseSignal()); // the file resumes from this exact byte later
+    for (final f in _inflight.values.toList()) {
+      f.abort(_PauseSignal()); // each file resumes from this exact byte later
+    }
     _speedSamples.clear();
     _tick(force: true);
     _sendHeartbeat();
@@ -198,7 +269,9 @@ class SenderService extends ChangeNotifier {
   void resume() {
     if (!_paused) return;
     _paused = false;
-    _lastProgress = DateTime.now();
+    for (final f in _inflight.values) {
+      f.lastProgress = DateTime.now();
+    }
     _resumeSignal?.complete();
     _tick(force: true);
     _sendHeartbeat();
@@ -206,18 +279,13 @@ class SenderService extends ChangeNotifier {
 
   void cancel() {
     _cancel = true;
-    _abort(_CancelSignal());
+    for (final f in _inflight.values.toList()) {
+      f.abort(_CancelSignal());
+    }
     if (_paused) {
       _paused = false;
       _resumeSignal?.complete();
     }
-  }
-
-  void _abort(Object reason) {
-    final req = _activeReq;
-    if (req == null) return;
-    _abortReason = reason;
-    req.abort(reason);
   }
 
   Future<void> _waitIfPaused() async {
@@ -268,8 +336,8 @@ class SenderService extends ChangeNotifier {
   // ---------------- network basics ----------------
 
   Future<void> ping() async {
-    if (pairing.version != kProtocolVersion) {
-      throw 'The other phone has a different version of this app. Install the same version on both phones.';
+    if (pairing.version < kMinProtocolVersion) {
+      throw 'The new phone has an older version of this app. Install the same version on both phones.';
     }
     final req = await _client.getUrl(pairing.uri('/ping'));
     req.headers.set('x-code', pairing.code);
@@ -277,6 +345,11 @@ class SenderService extends ChangeNotifier {
     final body = await utf8.decodeStream(res);
     if (res.statusCode == HttpStatus.forbidden) throw 'Wrong pairing code.';
     if (res.statusCode != 200) throw 'New phone answered: $body';
+    try {
+      receiverVersion = (jsonDecode(body) as Map)['v'] as int? ?? pairing.version;
+    } catch (_) {
+      receiverVersion = pairing.version;
+    }
   }
 
   Future<bool> _reachable() async {
@@ -288,9 +361,11 @@ class SenderService extends ChangeNotifier {
     }
   }
 
-  /// The new phone disappeared (Wi-Fi dropped, screen locked, out of range…).
-  /// Wait for it instead of failing every remaining file.
-  Future<void> _waitForReconnect() async {
+  /// The new phone disappeared (Wi-Fi dropped, out of range…). Every lane waits
+  /// on the same reconnect instead of failing its files.
+  Future<void> _waitForReconnect() => _reconnecting ??= _reconnect().whenComplete(() => _reconnecting = null);
+
+  Future<void> _reconnect() async {
     reconnecting = true;
     _speedSamples.clear();
     _tick(force: true);
@@ -302,7 +377,9 @@ class SenderService extends ChangeNotifier {
       delay = Duration(seconds: min(delay.inSeconds * 2, 15));
     }
     reconnecting = false;
-    _lastProgress = DateTime.now();
+    for (final f in _inflight.values) {
+      f.lastProgress = DateTime.now();
+    }
     _tick(force: true);
   }
 
@@ -321,6 +398,7 @@ class SenderService extends ChangeNotifier {
       final text = await utf8.decodeStream(res);
       if (res.statusCode == 409) throw _FileFailure('Checksum mismatch: the file arrived damaged');
       if (res.statusCode == 410) throw _FileFailure('The new phone lost the partly received file');
+      if (res.statusCode == 404) return null;
       if (res.statusCode != 200) throw _Rejected(text);
       return text.isEmpty ? null : jsonDecode(text);
     }
@@ -345,65 +423,56 @@ class SenderService extends ChangeNotifier {
     }
   }
 
-  // ---------------- one file ----------------
+  Future<Set<String>> _present(List<FileEntry> files) async {
+    final present = <String>{};
+    for (var i = 0; i < files.length && !_cancel; i += 1000) {
+      final chunk = files.sublist(i, min(i + 1000, files.length));
+      final res = await _requestReliably('POST', '/check', body: {
+        'items': [for (final f in chunk) {'key': f.key, 'size': f.size}],
+      }) as Map;
+      present.addAll((res['present'] as List).cast<String>());
+    }
+    return present;
+  }
+
+  // ---------------- one large file (resumable) ----------------
 
   static String _uploadId(FileEntry f) => sha1.convert(utf8.encode(f.key)).toString();
 
   /// Streams the file, continuing from whatever the new phone already has.
-  /// Returns the SHA-256 of the whole file.
-  Future<String> _upload(FileEntry f) async {
-    _abortReason = null;
+  Future<void> _upload(FileEntry f, int lane) async {
     final id = _uploadId(f);
     final file = File(f.path);
-    final size = await file.length();
-    if (size != f.size) {
-      throw _FileFailure('The file changed after the scan (${formatBytes(f.size)} → ${formatBytes(size)}). '
-          'Scan again to include the new version.');
-    }
-
     final status = await _request('GET', '/status', query: {'id': id}) as Map;
     var offset = status['received'] as int;
-    if (offset > size) offset = 0;
+    if (offset > f.size) offset = 0;
+    if (offset > 0) resumedBytes += offset;
 
-    final hash = Sha256Stream();
-    if (offset > 0) {
-      await for (final chunk in file.openRead(0, offset)) {
-        hash.add(chunk);
-      }
-      resumedBytes += offset;
-    }
-    currentFile = f;
-    currentFileBytes = offset;
-    currentFileResumedFrom = offset;
-    _lastProgress = DateTime.now();
+    final view = LaneView(f.rel, offset, f.size, resumedFrom: offset);
+    lanes[lane] = view;
     _tick(force: true);
 
     final req = await _client.postUrl(pairing.uri('/upload', {
       'id': id,
       'offset': '$offset',
-      'total': '$size',
+      'total': '${f.size}',
       'name': f.rel,
     }));
-    _activeReq = req;
+    final flight = _Inflight(req);
+    _inflight[lane] = flight;
     req.headers.set('x-code', pairing.code);
     req.headers.contentType = ContentType.binary;
-    req.contentLength = size - offset;
+    req.contentLength = f.size - offset;
     // Pause or Stop pressed while we were getting ready.
-    if (_cancel) _abort(_CancelSignal());
-    if (_paused) _abort(_PauseSignal());
+    if (_cancel) flight.abort(_CancelSignal());
+    if (_paused) flight.abort(_PauseSignal());
 
-    final watchdog = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      if (!_paused && DateTime.now().difference(_lastProgress) > stallTimeout) {
-        _abort(_Stall(stallTimeout));
-      }
-    });
     try {
-      await req.addStream(file.openRead(offset).map((chunk) {
-        hash.add(chunk);
-        currentFileBytes += chunk.length;
+      await req.addStream(readInBlocks(file, offset).map((chunk) {
+        view.bytes += chunk.length;
         _netBytes += chunk.length;
-        _lastProgress = DateTime.now();
-        debugOnChunk?.call(this, f, currentFileBytes);
+        flight.lastProgress = DateTime.now();
+        debugOnChunk?.call(this, f, view.bytes);
         _tick();
         return chunk;
       }));
@@ -411,56 +480,243 @@ class SenderService extends ChangeNotifier {
       final text = await utf8.decodeStream(res);
       if (res.statusCode != 200) throw _Rejected(text);
       final received = (jsonDecode(text) as Map)['received'] as int;
-      if (received != size) throw _RetryNow();
-      return hash.finish();
+      if (received != f.size) throw _RetryNow();
     } catch (e) {
-      final reason = _abortReason;
-      _abortReason = null;
-      if (reason != null) throw reason;
+      if (flight.abortReason != null) throw flight.abortReason!;
       rethrow;
     } finally {
-      watchdog.cancel();
-      _activeReq = null;
+      _inflight.remove(lane);
     }
   }
 
   /// Uploads and commits one file. Pauses and short connection drops are
   /// handled here; anything specific to this file becomes a [_FileFailure].
-  Future<String> _processFile(FileEntry f) async {
+  Future<String> _processFile(FileEntry f, int lane) async {
     var quickRetries = 0;
-    while (true) {
-      await _waitIfPaused();
-      if (_cancel) throw _CancelSignal();
-      try {
-        final sha = await _upload(f);
-        final commitTimeout = Duration(seconds: 60 + f.size ~/ (20 * 1024 * 1024));
-        final res = await _request('POST', '/commit', timeout: commitTimeout, body: {
-          'id': _uploadId(f),
-          'key': f.key,
-          'rel': f.rel,
-          'mtime': f.mtime,
-          'size': f.size,
-          'sha': sha,
-          'category': f.category.name,
-        }) as Map;
-        return res['status'] as String;
-      } on _PauseSignal {
-        continue; // wait for Resume, then pick up from the same byte
-      } on _RetryNow {
-        if (++quickRetries > 3) throw _FileFailure('The new phone kept losing part of this file');
-        continue;
-      } on _CancelSignal {
-        rethrow;
-      } on _FileFailure {
-        rethrow;
-      } catch (e) {
+    Future<String>? shaFuture;
+    try {
+      while (true) {
+        await _waitIfPaused();
         if (_cancel) throw _CancelSignal();
-        if (_paused) continue;
-        if (e is _Rejected || e is FileSystemException) throw _FileFailure(_describe(e));
-        // Timeout or network error: is the new phone still there?
-        if (await _reachable()) throw _FileFailure(_describe(e));
-        await _waitForReconnect(); // then retry this file; it doesn't count as a failure
+        try {
+          final size = await File(f.path).length();
+          if (size != f.size) {
+            throw _FileFailure('The file changed after the scan (${formatBytes(f.size)} → ${formatBytes(size)}). '
+                'Scan again to include the new version.');
+          }
+          // The checksum is worked out in a background isolate while the bytes stream.
+          shaFuture ??= sha256InBackground(f.path)..ignore();
+          await _upload(f, lane);
+          final sha = await shaFuture;
+          final commitTimeout = Duration(seconds: 60 + f.size ~/ (20 * 1024 * 1024));
+          final res = await _request('POST', '/commit', timeout: commitTimeout, body: {
+            'id': _uploadId(f),
+            'key': f.key,
+            'rel': f.rel,
+            'mtime': f.mtime,
+            'size': f.size,
+            'sha': sha,
+            'category': f.category.name,
+          }) as Map;
+          return res['status'] as String;
+        } on _PauseSignal {
+          continue; // wait for Resume, then pick up from the same byte
+        } on _RetryNow {
+          if (++quickRetries > 3) throw _FileFailure('The new phone kept losing part of this file');
+          continue;
+        } on _CancelSignal {
+          rethrow;
+        } on _FileFailure {
+          rethrow;
+        } catch (e) {
+          if (_cancel) throw _CancelSignal();
+          if (_paused) continue;
+          _troubleSinceCheck++;
+          if (e is _Rejected || e is FileSystemException) throw _FileFailure(_describe(e));
+          // Timeout or network error: is the new phone still there?
+          if (await _reachable()) throw _FileFailure(_describe(e));
+          await _waitForReconnect(); // then retry this file; it doesn't count as a failure
+        }
       }
+    } finally {
+      lanes.remove(lane);
+    }
+  }
+
+  // ---------------- a batch of small files ----------------
+
+  /// Sends many small files in one request: [len][header][bytes] per file.
+  /// Returns key -> 'saved' | 'already' | 'error: …' for the files the new phone handled.
+  Future<Map<String, String>> _sendBatch(List<FileEntry> files, List<String> shas, int lane) async {
+    final headers = [
+      for (var i = 0; i < files.length; i++)
+        utf8.encode(jsonEncode({
+          'key': files[i].key,
+          'rel': files[i].rel,
+          'size': files[i].size,
+          'mtime': files[i].mtime,
+          'category': files[i].category.name,
+          'sha': shas[i],
+        })),
+    ];
+    var length = 0;
+    var dataBytes = 0;
+    for (var i = 0; i < files.length; i++) {
+      length += 4 + headers[i].length + files[i].size;
+      dataBytes += files[i].size;
+    }
+    final view = LaneView(files.first.rel, 0, dataBytes, batch: true, batchCount: files.length);
+    lanes[lane] = view;
+    _tick(force: true);
+
+    final req = await _client.postUrl(pairing.uri('/batch', {
+      'id': '${_session}_${_seq++}',
+      'count': '${files.length}',
+      'total': '$dataBytes',
+    }));
+    final flight = _Inflight(req);
+    _inflight[lane] = flight;
+    req.headers.set('x-code', pairing.code);
+    req.headers.contentType = ContentType.binary;
+    req.contentLength = length;
+    if (_cancel) flight.abort(_CancelSignal());
+    if (_paused) flight.abort(_PauseSignal());
+
+    Stream<List<int>> frames() async* {
+      for (var i = 0; i < files.length; i++) {
+        view.rel = files[i].rel;
+        view.batchIndex = i;
+        final len = ByteData(4)..setUint32(0, headers[i].length);
+        yield len.buffer.asUint8List();
+        yield headers[i];
+        await for (final chunk in readInBlocks(File(files[i].path))) {
+          view.bytes += chunk.length;
+          _netBytes += chunk.length;
+          flight.lastProgress = DateTime.now();
+          _tick();
+          yield chunk;
+        }
+      }
+    }
+
+    try {
+      await req.addStream(frames());
+      final res = await req.close();
+      final text = await utf8.decodeStream(res);
+      if (res.statusCode != 200) throw _Rejected(text);
+      batchesSent++;
+      return ((jsonDecode(text) as Map)['results'] as Map).cast<String, String>();
+    } catch (e) {
+      if (flight.abortReason != null) throw flight.abortReason!;
+      rethrow;
+    } finally {
+      _inflight.remove(lane);
+    }
+  }
+
+  Future<void> _runBatch(List<FileEntry> files, int lane) async {
+    var pending = List<FileEntry>.of(files);
+    var cutOffs = 0;
+    var stalled = false; // the batch timed out: the new phone was stuck on one file
+    try {
+      while (pending.isNotEmpty) {
+        await _waitIfPaused();
+        if (_cancel) throw _CancelSignal();
+
+        // Drop files that vanished or changed since the scan.
+        final ok = <FileEntry>[];
+        for (final f in pending) {
+          try {
+            final size = await File(f.path).length();
+            if (size == f.size) {
+              ok.add(f);
+            } else {
+              _toDlq(f, 'The file changed after the scan. Scan again to include the new version.');
+            }
+          } on FileSystemException catch (e) {
+            _toDlq(f, _describe(e));
+          }
+        }
+        pending = ok;
+        if (pending.isEmpty) return;
+
+        List<String> shas;
+        try {
+          shas = await sha256ManyInBackground([for (final f in pending) f.path]);
+        } catch (_) {
+          // One of them can't be read: fall back to one at a time to find out which.
+          for (final f in pending) {
+            await _runSingle(f, lane);
+          }
+          return;
+        }
+
+        try {
+          final results = await _sendBatch(pending, shas, lane);
+          final missing = <FileEntry>[];
+          for (final f in pending) {
+            final r = results[f.key];
+            if (r == null) {
+              missing.add(f);
+            } else if (r == 'saved' || r == 'already') {
+              _recordSuccess(f, r);
+            } else {
+              _toDlq(f, r.startsWith('error: ') ? r.substring(7) : r);
+            }
+          }
+          pending = missing;
+          if (pending.isNotEmpty && ++cutOffs > 3) {
+            for (final f in pending) {
+              _toDlq(f, 'The batch kept being cut off');
+            }
+            return;
+          }
+        } on _PauseSignal {
+          // fall through: on resume, skip what already arrived and send the rest
+        } on _CancelSignal {
+          rethrow;
+        } catch (e) {
+          if (_cancel) throw _CancelSignal();
+          if (!_paused) {
+            _troubleSinceCheck++;
+            if (!await _reachable()) {
+              await _waitForReconnect();
+            } else if (e is _Stall) {
+              stalled = true; // skip just the stuck file; the rest of the batch carries on
+            } else if (++cutOffs > 3) {
+              for (final f in pending) {
+                _toDlq(f, _describe(e));
+              }
+              return;
+            }
+          }
+        }
+        // Whatever made it before the interruption is already saved: don't send it again.
+        if (pending.isNotEmpty && !_cancel) {
+          await _waitIfPaused();
+          final present = await _present(pending);
+          for (final f in pending.where((f) => present.contains(f.key))) {
+            _recordSuccess(f, 'saved');
+          }
+          pending = pending.where((f) => !present.contains(f.key)).toList();
+          if (stalled && pending.isNotEmpty) {
+            // The new phone saves batch files in order, so the stuck one is the
+            // first file it doesn't have yet.
+            _toDlq(pending.removeAt(0), _Stall(stallTimeout).toString());
+            stalled = false;
+          }
+        }
+      }
+    } finally {
+      lanes.remove(lane);
+    }
+  }
+
+  Future<void> _runSingle(FileEntry f, int lane) async {
+    try {
+      _recordSuccess(f, await _processFile(f, lane));
+    } on _FileFailure catch (e) {
+      _toDlq(f, e.message);
     }
   }
 
@@ -475,14 +731,107 @@ class SenderService extends ChangeNotifier {
   }
 
   void _recordSuccess(FileEntry f, String status) {
-    if (status == 'saved') {
+    if (status == 'saved' || status == 'cloned') {
       tally[f.category]!.sent++;
     } else {
       tally[f.category]!.already++;
     }
     _completedBytes += f.size;
-    recent.insert(0, RecentFile(f.rel, f.size, status != 'saved'));
-    if (recent.length > 6) recent.removeLast();
+    if (_mainPass) filesProcessed++;
+    recent.insert(0, RecentFile(f.rel, f.size, status == 'already'));
+    if (recent.length > 8) recent.removeLast();
+    _tick();
+  }
+
+  void _toDlq(FileEntry f, String error) {
+    dlq.add(DlqItem(f, error));
+    if (_mainPass) filesProcessed++;
+    _tick(force: true);
+  }
+
+  // ---------------- lanes ----------------
+
+  _Work? _nextWork(int lane) {
+    // Lane 0 prefers large files, the others prefer batches; anyone takes what's left.
+    final first = lane == 0 ? _bigQueue : _batchQueue;
+    final second = lane == 0 ? _batchQueue : _bigQueue;
+    if (first.isNotEmpty) return first.removeAt(0);
+    if (second.isNotEmpty) return second.removeAt(0);
+    return null;
+  }
+
+  Future<void> _lane(int lane) async {
+    while (!_cancel) {
+      await _waitIfPaused();
+      if (_cancel) return;
+      if (lane >= targetLanes) {
+        if (_bigQueue.isEmpty && _batchQueue.isEmpty) return;
+        await Future.delayed(const Duration(milliseconds: 300));
+        continue;
+      }
+      final work = _nextWork(lane);
+      if (work == null) return;
+      try {
+        if (work.file != null) {
+          await _runSingle(work.file!, lane);
+        } else {
+          await _runBatch(work.batch!, lane);
+        }
+      } on _CancelSignal {
+        return;
+      }
+    }
+  }
+
+  /// Adds a lane while speed keeps improving; removes one on stalls or errors.
+  void _adjustLanes() {
+    if (!fastMode || _paused || reconnecting) return;
+    final rate = (_netBytes - _bytesAtLastCheck) / 4.0;
+    _bytesAtLastCheck = _netBytes;
+    final waiting = _bigQueue.length + _batchQueue.length;
+    if (_troubleSinceCheck > 0) {
+      targetLanes = max(minLanes, targetLanes - 1);
+    } else if (rate > _rateAtLastCheck * 1.1 && waiting > 0) {
+      targetLanes = min(maxLanes, targetLanes + 1);
+    }
+    _troubleSinceCheck = 0;
+    _rateAtLastCheck = rate;
+  }
+
+  // ---------------- identical content ----------------
+
+  /// Finds files with the same name, size and content. Each is sent once; the
+  /// others are copied on the new phone. Returns duplicate -> (sha, original).
+  Future<Map<FileEntry, String>> _findDuplicates(List<FileEntry> files) async {
+    final groups = <String, List<FileEntry>>{};
+    for (final f in files) {
+      if (f.size < kDuplicateCheckMin) continue;
+      groups.putIfAbsent('${f.size}|${f.rel.split('/').last.toLowerCase()}', () => []).add(f);
+    }
+    final candidates = [for (final g in groups.values) if (g.length > 1) ...g];
+    if (candidates.isEmpty) return {};
+    statusLine = 'Looking for identical files (${candidates.length})…';
+    _tick(force: true);
+    final shaOf = <FileEntry, String>{};
+    for (var i = 0; i < candidates.length && !_cancel; i += 50) {
+      final chunk = candidates.sublist(i, min(i + 50, candidates.length));
+      try {
+        final shas = await sha256ManyInBackground([for (final f in chunk) f.path]);
+        for (var j = 0; j < chunk.length; j++) {
+          shaOf[chunk[j]] = shas[j];
+        }
+      } catch (_) {
+        // unreadable file: leave this chunk to be sent normally
+      }
+    }
+    final seen = <String>{};
+    final dups = <FileEntry, String>{};
+    for (final f in candidates) {
+      final sha = shaOf[f];
+      if (sha == null) continue;
+      if (!seen.add(sha)) dups[f] = sha;
+    }
+    return dups;
   }
 
   // ---------------- heartbeat to the new phone ----------------
@@ -499,6 +848,7 @@ class SenderService extends ChangeNotifier {
         'filesDone': filesProcessed,
         'filesTotal': filesToSend,
         'speed': bytesPerSecond.round(),
+        'lanes': lanes.length,
         'dlq': [for (final d in openDlq.take(200)) d.toJson()],
       };
 
@@ -531,6 +881,7 @@ class SenderService extends ChangeNotifier {
       final eta = this.eta;
       title = 'Sending to new phone • $pct%';
       text = '${formatBytes(bytesDone)} of ${formatBytes(totalBytes)}'
+          '${lanes.length > 1 ? ' • ${lanes.length} at once' : ''}'
           '${eta == null ? '' : ' • ${formatDuration(eta)} left'}';
     }
     Native.updateNotification(title, text, _paused || reconnecting ? -1 : pct);
@@ -546,9 +897,11 @@ class SenderService extends ChangeNotifier {
     receiverReport = null;
     dlq.clear();
     recent.clear();
+    lanes.clear();
+    _bigQueue.clear();
+    _batchQueue.clear();
     _completedBytes = totalBytes = filesProcessed = filesToSend = resumedBytes = 0;
-    currentFile = null;
-    currentFileBytes = 0;
+    clonedFiles = clonedBytes = batchesSent = 0;
     retryRound = 0;
     contactsTotal = contactsAdded = contactsExisting = contactsFailed = 0;
     for (final t in tally.values) {
@@ -563,17 +916,23 @@ class SenderService extends ChangeNotifier {
       _sendHeartbeat();
       _updateNotification();
     });
+    _watchdog = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (_paused || reconnecting) return;
+      final now = DateTime.now();
+      for (final f in _inflight.values.toList()) {
+        if (now.difference(f.lastProgress) > stallTimeout) {
+          _troubleSinceCheck++;
+          f.abort(_Stall(stallTimeout));
+        }
+      }
+    });
 
     try {
+      // Which protocol does the new phone speak? (It may still be on v3.)
+      await ping();
+
       // 1. Index check: skip files the new phone already has.
-      final present = <String>{};
-      for (var i = 0; i < plan.files.length && !_cancel; i += 1000) {
-        final chunk = plan.files.sublist(i, min(i + 1000, plan.files.length));
-        final res = await _requestReliably('POST', '/check', body: {
-          'items': [for (final f in chunk) {'key': f.key, 'size': f.size}],
-        }) as Map;
-        present.addAll((res['present'] as List).cast<String>());
-      }
+      final present = await _present(plan.files);
       final toSend = <FileEntry>[];
       for (final f in plan.files) {
         tally[f.category]!.selected++;
@@ -587,6 +946,9 @@ class SenderService extends ChangeNotifier {
       totalBytes = toSend.fold(0, (s, f) => s + f.size);
       contactsTotal = plan.contacts.length;
 
+      // 2. Identical content: send once, copy on the new phone.
+      final duplicates = fastMode ? await _findDuplicates(toSend) : <FileEntry, String>{};
+
       await _requestReliably('POST', '/hello', body: {
         'files': filesToSend,
         'bytes': totalBytes,
@@ -596,7 +958,7 @@ class SenderService extends ChangeNotifier {
       phase = SendPhase.sending;
       statusLine = null;
 
-      // 2. Contacts.
+      // 3. Contacts.
       for (var i = 0; i < plan.contacts.length && !_cancel; i += 50) {
         await _waitIfPaused();
         final batch = plan.contacts.sublist(i, min(i + 50, plan.contacts.length));
@@ -610,23 +972,76 @@ class SenderService extends ChangeNotifier {
       }
       statusLine = null;
 
-      // 3. Main pass. A file that times out or fails is parked in the retry queue.
-      for (final f in toSend) {
+      // 4. Main pass: lanes in parallel. Failures are parked in the retry queue.
+      final work = toSend.where((f) => !duplicates.containsKey(f)).toList();
+      if (fastMode) {
+        final small = <FileEntry>[];
+        for (final f in work) {
+          if (f.size <= kBatchFileMax) {
+            small.add(f);
+          } else {
+            _bigQueue.add(_Work.file(f));
+          }
+        }
+        var batch = <FileEntry>[];
+        var batchBytes = 0;
+        for (final f in small) {
+          if (batch.length >= kBatchMaxFiles || batchBytes + f.size > kBatchMaxBytes) {
+            _batchQueue.add(_Work.batch(batch));
+            batch = [];
+            batchBytes = 0;
+          }
+          batch.add(f);
+          batchBytes += f.size;
+        }
+        if (batch.isNotEmpty) _batchQueue.add(_Work.batch(batch));
+        targetLanes = min(startLanes, maxLanes);
+      } else {
+        _bigQueue.addAll(work.map(_Work.file)); // v3 phone: one file at a time, as before
+        targetLanes = 1;
+      }
+      _mainPass = true;
+      _laneController = Timer.periodic(const Duration(seconds: 4), (_) => _adjustLanes());
+      final laneCount = fastMode ? maxLanes : 1;
+      await Future.wait([for (var i = 0; i < laneCount; i++) _lane(i)]);
+      _laneController?.cancel();
+
+      // 5. Copies of identical content, after their originals are in place.
+      for (final entry in duplicates.entries) {
         if (_cancel) break;
+        final f = entry.key;
         try {
-          _recordSuccess(f, await _processFile(f));
-        } on _FileFailure catch (e) {
-          dlq.add(DlqItem(f, e.message));
+          final res = await _requestReliably('POST', '/clone', body: {
+            'sha': entry.value,
+            'key': f.key,
+            'rel': f.rel,
+            'size': f.size,
+            'mtime': f.mtime,
+            'category': f.category.name,
+          });
+          if (res != null) {
+            final status = (res as Map)['status'] as String;
+            if (status == 'saved') {
+              clonedFiles++;
+              clonedBytes += f.size;
+            }
+            _recordSuccess(f, status == 'saved' ? 'cloned' : status);
+            continue;
+          }
+        } on _CancelSignal {
+          break;
+        } catch (_) {
+          // fall back to sending it normally
+        }
+        try {
+          await _runSingle(f, 0);
         } on _CancelSignal {
           break;
         }
-        filesProcessed++;
-        currentFile = null;
-        currentFileBytes = 0;
-        _tick(force: true);
       }
+      _mainPass = false;
 
-      // 4. Retry queue: rounds with exponential backoff.
+      // 6. Retry queue: rounds with exponential backoff, one file at a time.
       if (!_cancel && openDlq.isNotEmpty) {
         phase = SendPhase.retrying;
         for (retryRound = 1; retryRound <= retryRounds && !_cancel; retryRound++) {
@@ -641,7 +1056,7 @@ class SenderService extends ChangeNotifier {
             item.attempts++;
             _tick(force: true);
             try {
-              _recordSuccess(item.file, await _processFile(item.file));
+              _recordSuccess(item.file, await _processFile(item.file, 0));
               item.status = DlqStatus.recovered;
             } on _FileFailure catch (e) {
               item.lastError = e.message;
@@ -651,8 +1066,6 @@ class SenderService extends ChangeNotifier {
               item.status = DlqStatus.waiting;
               break;
             }
-            currentFile = null;
-            currentFileBytes = 0;
             _tick(force: true);
           }
         }
@@ -667,7 +1080,6 @@ class SenderService extends ChangeNotifier {
         tally[d.file.category]!.failed++;
       }
 
-      currentFile = null;
       final complete = !_cancel && failedItems.isEmpty;
       try {
         receiverReport = await _request('POST', '/done', body: {
@@ -683,12 +1095,15 @@ class SenderService extends ChangeNotifier {
       phase = SendPhase.cancelled;
     } catch (e) {
       fatalError = 'The transfer stopped: ${_describe(e)}\n\n'
-          'Tap "Try again" to continue. Files that already arrived are skipped.';
+          'Tap "Continue" to pick up where it stopped. Files that already arrived are skipped.';
       phase = SendPhase.error;
     } finally {
+      _mainPass = false;
       _heartbeat?.cancel();
-      _heartbeat = null;
-      currentFile = null;
+      _watchdog?.cancel();
+      _laneController?.cancel();
+      _heartbeat = _watchdog = _laneController = null;
+      lanes.clear();
       statusLine = null;
       await Native.keepScreenOn(false);
       await Native.stopBackgroundService();
@@ -700,6 +1115,8 @@ class SenderService extends ChangeNotifier {
   void dispose() {
     cancel();
     _heartbeat?.cancel();
+    _watchdog?.cancel();
+    _laneController?.cancel();
     _client.close(force: true);
     super.dispose();
   }

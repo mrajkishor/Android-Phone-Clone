@@ -99,7 +99,18 @@ class _WaitingView extends StatelessWidget {
         SelectableText('Code  ${pairing.code}',
             style: t.headlineSmall?.copyWith(letterSpacing: 4, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        Card(
+          elevation: 0,
+          color: Colors.green.withValues(alpha: 0.08),
+          child: const ListTile(
+            leading: Icon(Icons.bolt, color: Colors.green),
+            title: Text('Tip for the fastest transfer'),
+            subtitle: Text('Turn on this phone’s hotspot (5 GHz if offered), join it from the old phone, '
+                'and keep the phones next to each other.'),
+          ),
+        ),
+        const SizedBox(height: 16),
         const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
           SizedBox(width: 12),
@@ -165,12 +176,23 @@ class _ProgressView extends StatelessWidget {
         ],
       ),
       const SizedBox(height: 12),
-      if (s.currentName != null && s.currentTotal > 0)
+      if (s.inFlight.length > 1)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(children: [
+            const Icon(Icons.bolt, size: 18, color: Colors.green),
+            const SizedBox(width: 6),
+            Text('${s.inFlight.length} arriving at once', style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ),
+      for (final f in s.inFlight.values)
         CurrentFileCard(
-          name: s.currentName!,
-          bytes: s.currentBytes,
-          total: s.currentTotal,
-          note: s.currentBytes >= s.currentTotal ? 'Verifying checksum and saving…' : null,
+          name: f.name.isEmpty ? 'Starting batch…' : f.name,
+          bytes: f.bytes,
+          total: f.total,
+          note: f.batch
+              ? 'Batch of ${f.batchCount} small files • ${f.batchDone} saved'
+              : (f.total > 0 && f.bytes >= f.total ? 'Verifying checksum and saving…' : null),
         ),
       const SizedBox(height: 8),
       RecentFilesList(items: [for (final r in s.recent) (r.rel, r.size, r.alreadyThere)]),
@@ -230,6 +252,12 @@ class _DoneView extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text('Plus ${s.alreadyBeforeStart} files that were already here from an earlier transfer.'),
+          ),
+        if (s.clonedFiles > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('${s.clonedFiles} identical files were copied here instead of being sent again '
+                '(${formatBytes(s.clonedBytes)} saved).'),
           ),
         const SizedBox(height: 8),
         if (s.finalFailures.isNotEmpty)

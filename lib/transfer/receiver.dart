@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:path/path.dart' as p;
@@ -25,8 +28,19 @@ class ReceivedFile {
   const ReceivedFile(this.rel, this.size, this.alreadyThere);
 }
 
+/// A file (or batch of small files) arriving right now.
+class InFlight {
+  String name;
+  int bytes;
+  int total;
+  final bool batch;
+  int batchDone = 0;
+  final int batchCount;
+  InFlight(this.name, this.bytes, this.total, {this.batch = false, this.batchCount = 0});
+}
+
 /// An upload being written right now, so a newer request for the same file
-/// (after a pause or reconnect) can take over cleanly.
+/// (after a pause, timeout or reconnect) can take over cleanly.
 class _ActiveUpload {
   final StreamIterator<List<int>> it;
   final Completer<void> finished = Completer<void>();
@@ -40,15 +54,66 @@ class _ActiveUpload {
   }
 }
 
+/// Reads length-prefixed frames out of a batch upload.
+class _FrameReader {
+  final StreamIterator<List<int>> it;
+  final Duration idle;
+  List<int> _buf = const [];
+  int _pos = 0;
+
+  _FrameReader(this.it, this.idle);
+
+  Future<bool> _fill() async {
+    if (_pos < _buf.length) return true;
+    if (!await it.moveNext().timeout(idle)) return false;
+    _buf = it.current;
+    _pos = 0;
+    return true;
+  }
+
+  /// Exactly [n] bytes, or null if the stream ended cleanly before the first byte.
+  Future<Uint8List?> readExact(int n) async {
+    final out = BytesBuilder(copy: false);
+    while (out.length < n) {
+      if (!await _fill()) {
+        if (out.length == 0) return null;
+        throw 'batch cut off mid-header';
+      }
+      final take = min(n - out.length, _buf.length - _pos);
+      out.add(_buf.sublist(_pos, _pos + take));
+      _pos += take;
+    }
+    return out.takeBytes();
+  }
+
+  /// Copies exactly [n] bytes into [sink], hashing them on the way.
+  Future<void> copyTo(IOSink sink, Sha256Stream hash, int n, void Function(int) onBytes) async {
+    var left = n;
+    while (left > 0) {
+      if (!await _fill()) throw 'batch cut off mid-file';
+      final take = min(left, _buf.length - _pos);
+      final part = (_pos == 0 && take == _buf.length) ? _buf : _buf.sublist(_pos, _pos + take);
+      sink.add(part);
+      hash.add(part);
+      _pos += take;
+      left -= take;
+      onBytes(take);
+    }
+  }
+}
+
 /// Runs on the NEW phone.
 ///
 /// * Each file is written to the SAME folder it had on the old phone, and only
 ///   kept if its SHA-256 matches what the old phone computed.
 /// * Partly received files are kept in a hidden staging folder, so a paused,
 ///   timed-out or interrupted file continues from the last byte received —
-///   even after the app restarts.
+///   even after the app restarts or is updated.
 /// * An index of every received file (path + size + modified time → SHA-256)
 ///   lets the old phone skip anything already here on later runs.
+/// * v4: several uploads at once, many small files per request (`/batch`),
+///   identical content copied locally (`/clone`), media index updated in batches.
+///   Every v3 endpoint still works, so a v3 phone can send to this one.
 class ReceiverService extends ChangeNotifier {
   /// Replaced in tests, where there is no Wi-Fi.
   @visibleForTesting
@@ -58,20 +123,27 @@ class ReceiverService extends ChangeNotifier {
   @visibleForTesting
   static Future<void> Function(String name)? debugBeforeReceive;
 
-  /// An upload with no incoming bytes for this long is closed (the old phone
-  /// will resume it).
+  /// Test hook: behave like a v3 phone (no batches, no cloning).
+  @visibleForTesting
+  static int debugProtocolVersion = kProtocolVersion;
+
+  /// An upload with no incoming bytes for this long is closed (the old phone resumes it).
   static const _receiveIdleTimeout = Duration(seconds: 60);
 
   HttpServer? _server;
   late Directory _root; // internal storage, e.g. /storage/emulated/0
   late Directory _tmp; // hidden staging folder on the same storage
+  late Directory _support;
   late File _indexFile;
   IOSink? _indexSink;
   final Map<String, ({String path, String sha})> _index = {};
+  final Map<String, String> _bySha = {}; // sha -> a saved path with that content
   final Map<String, _ActiveUpload> _active = {};
   final Map<String, String> _fullHashes = {}; // uploadId -> sha of a complete, uninterrupted upload
+  final List<String> _scanQueue = [];
   DateTime _lastTick = DateTime(0);
   Timer? _notifyTimer;
+  Timer? _scanTimer;
 
   PairingInfo? pairing;
   ReceivePhase phase = ReceivePhase.starting;
@@ -86,15 +158,15 @@ class ReceiverService extends ChangeNotifier {
   int alreadyBeforeStart = 0;
   int filesProcessed = 0;
   int bytesReceived = 0;
+  int clonedFiles = 0;
+  int clonedBytes = 0;
   final Map<Category, ReceiveTally> tally = {for (final c in Category.values) c: ReceiveTally()};
   int contactsAdded = 0, contactsExisting = 0, contactsFailed = 0;
   final List<String> errors = [];
   final List<ReceivedFile> recent = [];
 
-  // Current file, byte by byte.
-  String? currentName;
-  int currentBytes = 0;
-  int currentTotal = 0;
+  /// Everything arriving right now (one entry per parallel upload or batch).
+  final Map<String, InFlight> inFlight = {};
 
   /// Latest status reported by the old phone (overall progress, paused, retry queue…).
   Map<String, dynamic> sender = const {};
@@ -111,6 +183,9 @@ class ReceiverService extends ChangeNotifier {
   bool get senderReconnecting => sender['reconnecting'] == true;
   List<Map> get senderDlq => ((sender['dlq'] as List?) ?? const []).cast<Map>();
 
+  // Kept for screens that show a single "current file".
+  String? get currentName => inFlight.isEmpty ? null : inFlight.values.first.name;
+
   Future<void> start() async {
     try {
       final roots = await Native.storageRoots();
@@ -118,6 +193,7 @@ class ReceiverService extends ChangeNotifier {
       _root = Directory(roots.first);
       _tmp = Directory(p.join(_root.path, '.phonetransfer_tmp'));
       await _tmp.create(recursive: true); // kept between sessions so partial files can resume
+      _support = await getApplicationSupportDirectory();
       await _loadIndex();
 
       final host = await ipLookup();
@@ -125,16 +201,26 @@ class ReceiverService extends ChangeNotifier {
         throw 'Not connected to Wi-Fi. Connect both phones to the same Wi-Fi, '
             'or turn on hotspot on this phone and join it from the old phone.';
       }
+      // Reuse the last pairing code (and port) so the old phone can reconnect
+      // after a restart or an app update without scanning again.
+      final saved = await _loadSavedPairing();
+      final wantPort = saved?.$2 ?? kDefaultPort;
       try {
-        _server = await HttpServer.bind(InternetAddress.anyIPv4, kDefaultPort);
+        _server = await HttpServer.bind(InternetAddress.anyIPv4, wantPort);
       } on SocketException {
-        _server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
+        try {
+          _server = await HttpServer.bind(InternetAddress.anyIPv4, kDefaultPort);
+        } on SocketException {
+          _server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
+        }
       }
-      pairing = PairingInfo(host: host, port: _server!.port, code: newPairingCode());
+      pairing = PairingInfo(host: host, port: _server!.port, code: saved?.$1 ?? newPairingCode());
+      await _savePairing();
       _server!.listen(_handle);
       await Native.keepScreenOn(true);
       await Native.startBackgroundService('Ready to receive', 'Waiting for the old phone…', sending: false);
       _notifyTimer = Timer.periodic(const Duration(seconds: 1), (_) => _updateNotification());
+      _scanTimer = Timer.periodic(const Duration(seconds: 2), (_) => _flushScans());
       phase = ReceivePhase.waiting;
     } catch (e) {
       fatalError = '$e';
@@ -145,6 +231,8 @@ class ReceiverService extends ChangeNotifier {
 
   Future<void> stop() async {
     _notifyTimer?.cancel();
+    _scanTimer?.cancel();
+    _flushScans();
     for (final a in _active.values.toList()) {
       await a.it.cancel();
     }
@@ -186,20 +274,64 @@ class ReceiverService extends ChangeNotifier {
     } else if (senderReconnecting) {
       Native.updateNotification('Reconnecting to the old phone…', 'Keep both phones on the same Wi-Fi', -1);
     } else {
-      Native.updateNotification('Receiving • $pct%', currentName ?? '${formatBytes(done)} of ${formatBytes(total)}', pct);
+      final n = inFlight.length;
+      Native.updateNotification('Receiving • $pct%',
+          n > 1 ? '$n files at once • ${formatBytes(done)} of ${formatBytes(total)}' : (currentName ?? ''), pct);
     }
+  }
+
+  // ---------------- media index (batched) ----------------
+
+  void _queueScan(String path) {
+    _scanQueue.add(path);
+    if (_scanQueue.length >= 200) _flushScans();
+  }
+
+  void _flushScans() {
+    if (_scanQueue.isEmpty) return;
+    final batch = List<String>.of(_scanQueue);
+    _scanQueue.clear();
+    Native.scanFiles(batch);
+  }
+
+  // ---------------- saved pairing ----------------
+
+  File get _pairingFile => File(p.join(_support.path, 'pairing.json'));
+
+  Future<(String, int)?> _loadSavedPairing() async {
+    try {
+      final m = jsonDecode(await _pairingFile.readAsString()) as Map;
+      final age = DateTime.now().millisecondsSinceEpoch - (m['savedAt'] as int);
+      if (age > const Duration(days: 7).inMilliseconds) return null;
+      return (m['code'] as String, m['port'] as int);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _savePairing() async {
+    try {
+      await _pairingFile.writeAsString(jsonEncode({
+        'code': pairing!.code,
+        'port': pairing!.port,
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+      }));
+    } catch (_) {}
   }
 
   // ---------------- index of received files ----------------
 
   Future<void> _loadIndex() async {
-    final dir = await getApplicationSupportDirectory();
-    _indexFile = File(p.join(dir.path, 'received_index.jsonl'));
-    if (await _indexFile.exists()) {
-      for (final line in await _indexFile.readAsLines()) {
+    _indexFile = File(p.join(_support.path, 'received_index.jsonl'));
+    // v2 used a different file name: read it too, so nothing it received is sent again.
+    for (final f in [File(p.join(_support.path, 'received_v2.jsonl')), _indexFile]) {
+      if (!await f.exists()) continue;
+      for (final line in await f.readAsLines()) {
         try {
           final m = jsonDecode(line) as Map;
-          _index[m['key'] as String] = (path: m['path'] as String, sha: m['sha'] as String);
+          final path = m['path'] as String, sha = m['sha'] as String;
+          _index[m['key'] as String] = (path: path, sha: sha);
+          _bySha[sha] = path;
         } catch (_) {
           // a half-written last line from a crash: ignore it
         }
@@ -210,6 +342,7 @@ class ReceiverService extends ChangeNotifier {
 
   void _remember(String key, String path, String sha) {
     _index[key] = (path: path, sha: sha);
+    _bySha[sha] = path;
     _indexSink?.writeln(jsonEncode({'key': key, 'path': path, 'sha': sha}));
   }
 
@@ -230,11 +363,12 @@ class ReceiverService extends ChangeNotifier {
       await res.close();
       return;
     }
+    final v4 = debugProtocolVersion >= 4;
     try {
       Object? reply;
       switch (req.uri.path) {
         case '/ping':
-          reply = {'ok': true, 'v': kProtocolVersion};
+          reply = {'ok': true, 'v': debugProtocolVersion};
         case '/check':
           final body = await _json(req) as Map;
           reply = {
@@ -256,19 +390,27 @@ class ReceiverService extends ChangeNotifier {
           sender = (await _json(req) as Map).cast<String, dynamic>();
           reply = {'ok': true};
         case '/contacts':
-          currentName = 'Contacts';
           reply = await _importContacts((await _json(req) as List).cast<Map>());
         case '/status':
           final f = _partFile(req.uri.queryParameters['id']!);
           reply = {'received': await f.exists() ? await f.length() : 0};
         case '/upload':
-          final received = await _receiveUpload(req);
-          reply = {'received': received};
+          reply = {'received': await _receiveUpload(req)};
         case '/commit':
           final result = await _commit(await _json(req) as Map);
           if (result is int) {
             res.statusCode = result; // 409 checksum mismatch / 410 partial file missing
             reply = {'error': result == 409 ? 'checksum mismatch' : 'partial file missing'};
+          } else {
+            reply = {'status': result};
+          }
+        case '/batch' when v4:
+          reply = {'results': await _receiveBatch(req)};
+        case '/clone' when v4:
+          final result = await _clone(await _json(req) as Map);
+          if (result == null) {
+            res.statusCode = HttpStatus.notFound;
+            reply = {'error': 'no local copy'};
           } else {
             reply = {'status': result};
           }
@@ -278,6 +420,7 @@ class ReceiverService extends ChangeNotifier {
           complete = body['complete'] == true;
           finalFailures = ((body['failed'] as List?) ?? const []).cast<Map>();
           await _indexSink?.flush();
+          _flushScans();
           if (complete) {
             // Nothing left to resume: clear the staging folder.
             try {
@@ -286,23 +429,25 @@ class ReceiverService extends ChangeNotifier {
             } catch (_) {}
           }
           phase = ReceivePhase.done;
-          currentName = null;
+          inFlight.clear();
           _updateNotification();
           await Native.keepScreenOn(false);
           reply = {
             'saved': savedTotal,
             'already': alreadyTotal,
+            'cloned': clonedFiles,
             'contactsAdded': contactsAdded,
             'contactsExisting': contactsExisting,
             'contactsFailed': contactsFailed,
           };
         default:
+          await req.drain<void>();
           res.statusCode = HttpStatus.notFound;
       }
       res.headers.contentType = ContentType.json;
       res.write(jsonEncode(reply));
     } catch (e) {
-      errors.add('${currentName ?? req.uri.path}: $e');
+      errors.add('${req.uri.path}: $e');
       res.statusCode = HttpStatus.internalServerError;
       res.write('$e');
     }
@@ -317,7 +462,7 @@ class ReceiverService extends ChangeNotifier {
   Future<dynamic> _json(HttpRequest req) async => jsonDecode(await utf8.decodeStream(req));
 
   void _resetSession() {
-    filesProcessed = bytesReceived = 0;
+    filesProcessed = bytesReceived = clonedFiles = clonedBytes = 0;
     contactsAdded = contactsExisting = contactsFailed = 0;
     senderCancelled = complete = false;
     finalFailures = const [];
@@ -329,7 +474,7 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
-  // ---------------- files ----------------
+  // ---------------- single files (resumable) ----------------
 
   File _partFile(String id) => File(p.join(_tmp.path, '${id.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}.part'));
 
@@ -340,7 +485,6 @@ class ReceiverService extends ChangeNotifier {
     final offset = int.parse(q['offset'] ?? '0');
     final total = int.parse(q['total'] ?? '0');
     final name = q['name'] ?? 'file';
-
     final part = _partFile(id);
     final it = StreamIterator<List<int>>(req);
     final me = _ActiveUpload(it);
@@ -354,8 +498,7 @@ class ReceiverService extends ChangeNotifier {
       final hook = debugBeforeReceive;
       if (hook != null) await Future.any([hook(name), me.superseded.future]);
       if (!identical(_active[id], me)) {
-        // An even newer request took over while we waited: step aside.
-        await it.cancel();
+        await it.cancel(); // an even newer request took over while we waited
         return await part.exists() ? await part.length() : 0;
       }
 
@@ -366,9 +509,8 @@ class ReceiverService extends ChangeNotifier {
       }
       _fullHashes.remove(id);
 
-      currentName = name;
-      currentBytes = offset;
-      currentTotal = total;
+      final flight = InFlight(name, offset, total);
+      inFlight[id] = flight;
       _tick(force: true);
 
       final sink = part.openWrite(mode: offset == 0 ? FileMode.write : FileMode.append);
@@ -379,7 +521,7 @@ class ReceiverService extends ChangeNotifier {
           final chunk = it.current;
           sink.add(chunk);
           hash?.add(chunk);
-          currentBytes += chunk.length;
+          flight.bytes += chunk.length;
           bytesReceived += chunk.length;
           _tick();
         }
@@ -394,6 +536,7 @@ class ReceiverService extends ChangeNotifier {
       if (clean && hash != null && length == total && identical(_active[id], me)) {
         _fullHashes[id] = hash.finish();
       }
+      if (length != total) inFlight.remove(id); // paused / cut off: no longer arriving
       _tick(force: true);
       return length;
     } finally {
@@ -408,27 +551,146 @@ class ReceiverService extends ChangeNotifier {
     final key = body['key'] as String;
     final sha = body['sha'] as String;
     final size = body['size'] as int;
-    final rel = _safeRel(body['rel'] as String);
-    final mtime = body['mtime'] as int;
-    final category = Category.values.byName(body['category'] as String);
     final part = _partFile(id);
-    currentName = rel;
+    try {
+      // A repeated commit (the reply to the first one got lost) is recognised here.
+      final known = _index[key];
+      if (known != null && known.sha == sha && File(known.path).existsSync()) {
+        if (await part.exists()) await part.delete();
+        return 'already';
+      }
+      if (!await part.exists() || await part.length() != size) return 410;
+      // A resumed file is checksummed in the background so receiving doesn't stutter.
+      final actual = _fullHashes.remove(id) ?? await sha256InBackground(part.path);
+      if (actual != sha) {
+        await part.delete();
+        return 409;
+      }
+      return await _finishFile(part,
+          key: key,
+          sha: sha,
+          size: size,
+          rel: body['rel'] as String,
+          mtime: body['mtime'] as int,
+          category: Category.values.byName(body['category'] as String));
+    } finally {
+      inFlight.remove(id);
+    }
+  }
 
-    // A repeated commit (the reply to the first one got lost) is recognised here.
+  // ---------------- batches of small files ----------------
+
+  /// Frames: [4-byte big-endian header length][header JSON][file bytes] …
+  /// Each file is verified and saved as soon as it has arrived.
+  Future<Map<String, String>> _receiveBatch(HttpRequest req) async {
+    final count = int.tryParse(req.uri.queryParameters['count'] ?? '') ?? 0;
+    final total = int.tryParse(req.uri.queryParameters['total'] ?? '') ?? 0;
+    final flightId = 'batch:${req.uri.queryParameters['id'] ?? DateTime.now().microsecondsSinceEpoch}';
+    final flight = InFlight('', 0, total, batch: true, batchCount: count);
+    inFlight[flightId] = flight;
+    final results = <String, String>{};
+    final it = StreamIterator<List<int>>(req);
+    final reader = _FrameReader(it, _receiveIdleTimeout);
+    try {
+      while (true) {
+        final lenBytes = await reader.readExact(4);
+        if (lenBytes == null) break;
+        final headerLen = ByteData.sublistView(lenBytes).getUint32(0);
+        final header = jsonDecode(utf8.decode((await reader.readExact(headerLen))!)) as Map;
+        final key = header['key'] as String;
+        final size = header['size'] as int;
+        flight.name = header['rel'] as String;
+        _tick();
+
+        final hook = debugBeforeReceive;
+        if (hook != null) await hook(header['rel'] as String);
+        final part = File(p.join(_tmp.path, 'b${sha1.convert(utf8.encode(key))}.part'));
+        final sink = part.openWrite();
+        final hash = Sha256Stream();
+        try {
+          await reader.copyTo(sink, hash, size, (n) {
+            flight.bytes += n;
+            bytesReceived += n;
+            _tick();
+          });
+        } finally {
+          await sink.flush();
+          await sink.close();
+        }
+        if (hash.finish() != header['sha']) {
+          await part.delete();
+          results[key] = 'error: checksum mismatch';
+        } else {
+          try {
+            results[key] = await _finishFile(part,
+                key: key,
+                sha: header['sha'] as String,
+                size: size,
+                rel: header['rel'] as String,
+                mtime: header['mtime'] as int,
+                category: Category.values.byName(header['category'] as String));
+          } catch (e) {
+            results[key] = 'error: $e';
+          }
+        }
+        flight.batchDone++;
+      }
+    } catch (e) {
+      await it.cancel(); // cut off: the files already saved are in `results` and in the index
+    } finally {
+      inFlight.remove(flightId);
+    }
+    return results;
+  }
+
+  // ---------------- identical content ----------------
+
+  /// Copies a file this phone already has with the same content to a new path,
+  /// so the old phone doesn't send the same bytes twice.
+  Future<String?> _clone(Map body) async {
+    final sha = body['sha'] as String;
+    final size = body['size'] as int;
+    final srcPath = _bySha[sha];
+    if (srcPath == null) return null;
+    final src = File(srcPath);
+    if (!await src.exists() || await src.length() != size) return null;
+    final part = File(p.join(_tmp.path, 'c${sha1.convert(utf8.encode(body['key'] as String))}.part'));
+    await src.copy(part.path);
+    final status = await _finishFile(part,
+        key: body['key'] as String,
+        sha: sha,
+        size: size,
+        rel: body['rel'] as String,
+        mtime: body['mtime'] as int,
+        category: Category.values.byName(body['category'] as String));
+    if (status == 'saved') {
+      clonedFiles++;
+      clonedBytes += size;
+    }
+    return status;
+  }
+
+  // ---------------- putting files in place ----------------
+
+  /// Moves a verified staging file into place, records it in the index and
+  /// updates the counters. Returns 'saved' or 'already'.
+  Future<String> _finishFile(File part,
+      {required String key,
+      required String sha,
+      required int size,
+      required String rel,
+      required int mtime,
+      required Category category}) async {
     final known = _index[key];
     if (known != null && known.sha == sha && File(known.path).existsSync()) {
       if (await part.exists()) await part.delete();
+      tally[category]!.already++;
+      filesProcessed++;
       return 'already';
     }
-    if (!await part.exists() || await part.length() != size) return 410;
-    final actual = _fullHashes.remove(id) ?? await sha256OfFile(part);
-    if (actual != sha) {
-      await part.delete();
-      return 409;
-    }
-
     try {
-      final (status, path) = await _place(part, rel, sha, mtime);
+      final safe = _safeRel(rel);
+      final (status, path) = await _place(part, safe, sha, mtime);
       _remember(key, path, sha);
       if (status == 'saved') {
         tally[category]!.saved++;
@@ -436,12 +698,12 @@ class ReceiverService extends ChangeNotifier {
         tally[category]!.already++;
       }
       filesProcessed++;
-      recent.insert(0, ReceivedFile(rel, size, status != 'saved'));
+      recent.insert(0, ReceivedFile(safe, size, status != 'saved'));
       if (recent.length > 6) recent.removeLast();
-      currentName = null;
       return status;
     } catch (e) {
       tally[category]!.failed++;
+      if (await part.exists()) await part.delete();
       rethrow;
     }
   }
@@ -469,7 +731,7 @@ class ReceiverService extends ChangeNotifier {
     await dest.parent.create(recursive: true);
     if (await dest.exists()) {
       // Same name already here: if it's the same content, don't write a copy.
-      if (await dest.length() == await part.length() && await sha256OfFile(dest) == sha) {
+      if (await dest.length() == await part.length() && await sha256InBackground(dest.path) == sha) {
         await part.delete();
         return ('already', dest.path);
       }
@@ -482,10 +744,9 @@ class ReceiverService extends ChangeNotifier {
       await part.delete();
     }
     try {
-      await Native.finalizeFile(dest.path, mtime).timeout(const Duration(seconds: 15));
-    } catch (_) {
-      // The file is in place; the media index will catch up on its own.
-    }
+      await dest.setLastModified(DateTime.fromMillisecondsSinceEpoch(mtime));
+    } catch (_) {}
+    _queueScan(dest.path); // media index updated in batches, not after every file
     return ('saved', dest.path);
   }
 

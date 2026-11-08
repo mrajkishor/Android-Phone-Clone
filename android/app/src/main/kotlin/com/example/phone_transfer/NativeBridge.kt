@@ -57,6 +57,12 @@ class NativeBridge(private val ctx: Context) {
                         }
                     }
 
+                    "scanFiles" -> {
+                        val paths = call.argument<List<String>>("paths") ?: emptyList()
+                        if (paths.isNotEmpty()) MediaScannerConnection.scanFile(ctx, paths.toTypedArray(), null, null)
+                        result.success(null)
+                    }
+
                     "startService" -> {
                         try {
                             TransferService.start(

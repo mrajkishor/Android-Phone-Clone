@@ -5,6 +5,7 @@ import '../transfer/native.dart';
 import '../transfer/protocol.dart';
 import '../transfer/scanner.dart';
 import '../transfer/sender.dart';
+import '../transfer/session_store.dart';
 import 'permission_gate.dart';
 import 'report_table.dart';
 import 'scan_screen.dart';
@@ -45,6 +46,15 @@ class _SendBodyState extends State<_SendBody> {
   final Set<Category> _selected = {for (final c in Category.values) if (c.onByDefault) c};
   bool _sendContacts = true;
   SendPlan? _plan;
+  LastSession? _last; // an unfinished transfer that can be continued
+
+  @override
+  void initState() {
+    super.initState();
+    LastSession.load().then((s) {
+      if (mounted && s != null) setState(() => _last = s);
+    });
+  }
 
   @override
   void dispose() {
@@ -55,6 +65,28 @@ class _SendBodyState extends State<_SendBody> {
   Future<void> _scanAndConnect() async {
     final pairing = await Navigator.push<PairingInfo>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
     if (pairing == null) return;
+    await _connect(pairing);
+  }
+
+  /// Continue the last unfinished transfer without scanning the QR code again.
+  Future<void> _continueLast() async {
+    final last = _last!;
+    final ok = await _connect(last.pairing, quiet: true);
+    if (!ok) {
+      setState(() => _error = 'Couldn’t reach the new phone at ${last.pairing.host}. '
+          'Open the app on the new phone (“This is the NEW phone”). If it shows a different address, '
+          'scan its QR code instead.');
+      return;
+    }
+    setState(() {
+      _selected
+        ..clear()
+        ..addAll(last.categories);
+      _sendContacts = last.contacts;
+    });
+  }
+
+  Future<bool> _connect(PairingInfo pairing, {bool quiet = false}) async {
     setState(() {
       _step = _Step.preparing;
       _error = null;
@@ -66,10 +98,12 @@ class _SendBodyState extends State<_SendBody> {
       sender.dispose();
       setState(() {
         _step = _Step.connect;
-        _error = 'Couldn’t reach the new phone at ${pairing.host}.\n'
-            'Make sure both phones are on the same Wi-Fi (or the old phone is on the new phone’s hotspot).\n\n$e';
+        _error = quiet
+            ? null
+            : 'Couldn’t reach the new phone at ${pairing.host}.\n'
+                'Make sure both phones are on the same Wi-Fi (or the old phone is on the new phone’s hotspot).\n\n$e';
       });
-      return;
+      return false;
     }
     _sender = sender;
     try {
@@ -81,9 +115,10 @@ class _SendBodyState extends State<_SendBody> {
         _step = _Step.connect;
         _error = 'Couldn’t read this phone’s storage: $e';
       });
-      return;
+      return false;
     }
     setState(() => _step = _Step.choose);
+    return true;
   }
 
   void _start() {
@@ -95,7 +130,17 @@ class _SendBodyState extends State<_SendBody> {
     }
     _plan = SendPlan(files, contacts);
     setState(() => _step = _Step.transfer);
-    _sender!.run(_plan!);
+    _runPlan();
+  }
+
+  Future<void> _runPlan() async {
+    final s = _sender!;
+    // Remember this transfer so it can be continued after a restart or an app update.
+    await LastSession(s.pairing, Set.of(_selected), _sendContacts, DateTime.now()).save();
+    await s.run(_plan!);
+    if (s.phase == SendPhase.done && s.failedItems.isEmpty && s.contactsFailed == 0) {
+      await LastSession.clear();
+    }
   }
 
   Future<void> _confirmStop() async {
@@ -153,6 +198,14 @@ class _SendBodyState extends State<_SendBody> {
     );
   }
 
+  static String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inHours < 1) return '${d.inMinutes} min ago';
+    if (d.inDays < 1) return '${d.inHours} h ago';
+    return '${d.inDays} day(s) ago';
+  }
+
   Widget _buildConnect() {
     final t = Theme.of(context).textTheme;
     return Column(
@@ -161,7 +214,33 @@ class _SendBodyState extends State<_SendBody> {
         Text('1. On the new phone, open this app and tap “This is the NEW phone”.', style: t.bodyLarge),
         const SizedBox(height: 8),
         Text('2. Scan the QR code it shows.', style: t.bodyLarge),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
+        if (_last != null) ...[
+          Card(
+            elevation: 0,
+            color: Theme.of(context).colorScheme.primaryContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  const Icon(Icons.history),
+                  const SizedBox(width: 8),
+                  Text('Unfinished transfer', style: t.titleMedium),
+                ]),
+                const SizedBox(height: 4),
+                Text('To ${_last!.pairing.host}, started ${_ago(_last!.startedAt)}. '
+                    'Files already on the new phone are skipped and half-sent files continue where they stopped.'),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _continueLast,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Continue previous transfer'),
+                ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         FilledButton.icon(
           onPressed: _scanAndConnect,
           icon: const Icon(Icons.qr_code_scanner),
@@ -277,7 +356,7 @@ class _SendBodyState extends State<_SendBody> {
                     title: 'Sending',
                     subtitle: 'You can leave the app. The transfer continues in the background.');
 
-    final f = s.currentFile;
+    final lanes = s.lanes.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Expanded(
         child: ListView(children: [
@@ -291,17 +370,35 @@ class _SendBodyState extends State<_SendBody> {
             filesLine: '${s.filesProcessed} of ${s.filesToSend} files',
             extraLines: [
               if (s.filesAlready > 0) '${s.filesAlready} already on the new phone — skipped',
+              if (s.clonedFiles > 0)
+                '${s.clonedFiles} identical files copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent)',
+              if (s.resumedBytes > 0) '${formatBytes(s.resumedBytes)} resumed, not re-sent',
               if (s.contactsTotal > 0) 'Contacts: ${s.contactsAdded} added, ${s.contactsExisting} already there',
               if (s.statusLine != null) s.statusLine!,
             ],
           ),
           const SizedBox(height: 12),
-          if (f != null)
+          Row(children: [
+            Icon(s.fastMode ? Icons.bolt : Icons.speed, size: 18, color: s.fastMode ? Colors.green : Colors.grey),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                s.fastMode
+                    ? 'Fast mode • ${lanes.length} in flight (up to ${s.targetLanes} lanes, adjusts to your Wi-Fi)'
+                    : 'Compatibility mode • the new phone runs an older version, so one file at a time. '
+                        'Update it to v4 for faster transfers.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          for (final MapEntry(value: l) in lanes)
             CurrentFileCard(
-              name: f.rel,
-              bytes: s.currentFileBytes,
-              total: f.size,
-              resumedFrom: s.currentFileResumedFrom,
+              name: l.rel,
+              bytes: l.bytes,
+              total: l.total,
+              resumedFrom: l.resumedFrom,
+              note: l.batch ? 'Batch of ${l.batchCount} small files • file ${l.batchIndex + 1} of ${l.batchCount}' : null,
             ),
           const SizedBox(height: 8),
           RecentFilesList(items: [for (final r in s.recent) (r.rel, r.size, r.alreadyThere)]),
@@ -386,6 +483,16 @@ class _SendBodyState extends State<_SendBody> {
           title: Text('${s.dlq.where((d) => d.status == DlqStatus.recovered).length} file(s) '
               'recovered from the retry queue'),
         ),
+      if (s.clonedFiles > 0 || s.resumedBytes > 0 || s.batchesSent > 0)
+        ListTile(
+          leading: const Icon(Icons.bolt, color: Colors.green),
+          title: const Text('Speed-ups'),
+          subtitle: Text([
+            if (s.batchesSent > 0) '${s.batchesSent} batches of small files',
+            if (s.clonedFiles > 0) '${s.clonedFiles} identical files copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent)',
+            if (s.resumedBytes > 0) '${formatBytes(s.resumedBytes)} continued instead of re-sent',
+          ].join('\n')),
+        ),
       if (r != null)
         ListTile(
           leading: const Icon(Icons.verified_outlined),
@@ -400,7 +507,7 @@ class _SendBodyState extends State<_SendBody> {
       const SizedBox(height: 16),
       if (!allGood)
         FilledButton.icon(
-          onPressed: () => _sender!.run(_plan!),
+          onPressed: _runPlan,
           icon: const Icon(Icons.refresh),
           label: Text(s.phase == SendPhase.done ? 'Try the failed files again' : 'Continue'),
         ),

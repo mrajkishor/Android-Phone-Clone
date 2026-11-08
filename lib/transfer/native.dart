@@ -23,6 +23,14 @@ class Native {
   static Future<void> finalizeFile(String path, int mtime) =>
       _c.invokeMethod('finalizeFile', {'path': path, 'mtime': mtime});
 
+  /// Tells Android's media index about many new files at once, without waiting.
+  static Future<void> scanFiles(List<String> paths) async {
+    if (paths.isEmpty) return;
+    try {
+      await _c.invokeMethod('scanFiles', {'paths': paths});
+    } catch (_) {}
+  }
+
   // ---- background running ----
 
   /// Starts the foreground service that keeps the transfer alive when the app

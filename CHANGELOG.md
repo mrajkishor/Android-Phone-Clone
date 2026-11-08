@@ -5,13 +5,36 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [4.0.0](#400--2026-11-08) | Fast: parallel lanes, batches, duplicate cloning; works with v3 phones | 4 (talks 3) | ✅ even mid-transfer | ~15 min |
 | [3.0.0](#300--2026-11-08) | Unstoppable: survives timeouts, drops, pauses and the app being closed | 3 | ✅ | ~16 min |
 | [2.0.0](#200--2026-11-08) | Exact: same folders, same dates, verified, no duplicates | 2 | ✅ | ~14 min |
 | [1.0.0](#100--2026-11-08) | It works: first Wi-Fi transfer between two phones | 1 | — | ~43 min |
 
-> Each version changed the network protocol, so **both phones must run the same version**.
+> v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [4.0.0] — 2026-11-08
+
+### Why this release
+v3 sent one file at a time. For large videos that was fine, since Wi-Fi was the limit. For a phone full of photos and documents, each file cost about 3 round trips plus a wait for Android's media index, so the Wi-Fi sat idle much of the time. v4 keeps every v3 guarantee and makes transfers **several times faster**. It's also the first version you can **update to in the middle of a transfer**.
+
+### Added
+- **Parallel lanes.** 2–6 transfers in flight at once. It starts with 3, adds a lane every 4 s while speed keeps rising, and drops one on stalls or errors. Lane 1 takes large files (over 2 MB), so a big video never blocks the photos behind it.
+- **Small-file batches.** Files of 2 MB or less are sent up to 300 at a time (max 32 MB) in one request (`POST /batch`). Each file carries its own SHA-256 and is verified and saved as soon as it arrives. If a batch stalls, only the file the new phone was stuck on goes to the retry queue; the files already saved are kept and the rest are re-sent.
+- **Duplicate cloning.** Files of 64 KB or more that share a name and size are checksummed first. Identical content is sent once, and the new phone copies it to the other paths locally (`POST /clone`). It falls back to a normal upload if the original didn't arrive.
+- **Background checksums.** SHA-256 now runs in worker isolates on both phones, so the main thread only moves bytes.
+- **Batched media indexing.** New files are reported to Android's media index 200 at a time, every 2 s, instead of waiting after each file. Original dates are restored directly.
+- **1 MB reads** for fewer, larger socket writes.
+- **One-tap "Continue previous transfer".** The old phone remembers the last unfinished transfer (pairing and selected categories), and the new phone keeps its pairing code and port for 7 days. No QR scan is needed to continue after a restart or an update.
+- **Update from v3 mid-transfer.** v4 reads v3's index (and v2's `received_v2.jsonl`), uses the same staging folder and file IDs, and is signed with the same key. A transfer paused on v3 continues on v4 from the exact byte, with nothing re-sent.
+- **Works with v3 phones in both directions.** The QR code still says `v: 3` for v3 apps and adds `max: 4`. A v4 old phone sending to a v3 new phone uses compatibility mode (one file at a time); a v3 old phone sending to a v4 new phone works exactly like v3.
+- **UI.** Every file and batch in flight is shown with live bytes, plus the lane count, a fast/compatibility mode indicator, cloned and resumed totals, a "Speed-ups" summary at the end, and a fastest-setup tip on the QR screen (5 GHz hotspot).
+- **4 new tests:** speed features (lanes, batches, cloning, exact copies), QR compatibility, update from v3 with a half-sent file and old index records, and a v3 new phone. **10 tests in total**, all passing.
+
+### Changed
+- Protocol version **3 → 4**. The new phone keeps every v3 endpoint, and `/ping` now reports its version.
+- A stuck file inside a batch is identified from what the new phone has actually saved, rather than from what the old phone last wrote, since small files can be fully buffered before the new phone reads them.
 
 ## [3.0.0] — 2026-11-08
 
@@ -95,6 +118,7 @@ A line-by-line review of v1 against two requirements — *"nothing on the old ph
 - No checksum verification.
 - Documents had to be picked by hand, so files could be missed.
 
+[4.0.0]: https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0
 [3.0.0]: https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0
 [2.0.0]: #200--2026-11-08
 [1.0.0]: #100--2026-11-08

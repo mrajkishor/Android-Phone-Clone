@@ -2,15 +2,15 @@
 
 # 📱➡️📱 Android Phone Clone
 
-### Move *everything* from your old Android phone to your new one — over Wi-Fi, verified, without duplicates.
+### Move *everything* from your old Android phone to your new one — over Wi-Fi, fast, verified, without duplicates.
 
-[![Release](https://img.shields.io/badge/release-v3.0.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0)
+[![Release](https://img.shields.io/badge/release-v4.0.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Tests](https://img.shields.io/badge/tests-6%20passing-brightgreen?style=for-the-badge)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-10%20passing-brightgreen?style=for-the-badge)](#-testing)
 [![No cloud](https://img.shields.io/badge/cloud-none-lightgrey?style=for-the-badge)](#-privacy--safety)
 
-**[⬇️ Download the APK](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0)** ·
+**[⬇️ Download the APK](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0)** ·
 [Quick start](#-quick-start) ·
 [Features](#-features) ·
 [How it works](#-how-it-works) ·
@@ -23,12 +23,14 @@
 
 ## 📑 Table of contents
 
-- [Why v3?](#-why-v3)
+- [Why v4?](#-why-v4)
 - [Features](#-features)
 - [Quick start](#-quick-start)
+- [Upgrading from v3](#%EF%B8%8F-upgrading-from-v3)
 - [What gets transferred](#-what-gets-transferred)
 - [The transfer screen, explained](#-the-transfer-screen-explained)
 - [How it works](#-how-it-works)
+- [Speed: how v4 goes faster](#-speed-how-v4-goes-faster)
 - [Reliability: timeouts, retry queue, resume](#-reliability-timeouts-retry-queue-resume)
 - [No duplicates — the index](#-no-duplicates--the-index)
 - [Privacy & safety](#-privacy--safety)
@@ -46,29 +48,33 @@
 
 ---
 
-## 🚀 Why v3?
+## 🚀 Why v4?
 
-This app was built in three rounds. Each version fixed real gaps found in the one before it, and **v3 contains everything from v1 and v2**:
+This app was built in four rounds. Each version fixed real gaps found in the one before it, and **v4 contains everything from v1, v2 and v3**:
 
-| | **v1** — *It works* | **v2** — *It's exact* | **v3** — *It's unstoppable* |
-|---|:---:|:---:|:---:|
-| Photos, videos, music, contacts | ✅ | ✅ | ✅ |
-| QR-code pairing over local Wi-Fi | ✅ | ✅ | ✅ |
-| Documents & other files | ✋ picked by hand | ✅ found automatically | ✅ found automatically |
-| Same folders as the old phone | ❌ flattened | ✅ | ✅ |
-| Original photo/video dates | ❌ reset to today | ✅ | ✅ |
-| SHA-256 checksum on every file | ❌ | ✅ | ✅ |
-| No duplicates on re-runs | ❌ | ✅ index | ✅ index + content check |
-| Progress | file count | bytes, %, speed, ETA | **live per-file bytes** |
-| Timeouts & retry queue (DLQ) | ❌ | ❌ | ✅ exponential backoff |
-| Pause / resume | ❌ | ❌ | ✅ from the exact byte |
-| Resume a half-sent file | ❌ | ❌ restarts the file | ✅ continues it |
-| Survives Wi-Fi drops | ❌ | ❌ | ✅ waits & reconnects |
-| Keeps running in the background | ❌ | ❌ | ✅ foreground service |
-| End report | counts | per-category table | 🎉 or failed-file list with paths & errors |
+| | **v1** — *It works* | **v2** — *It's exact* | **v3** — *It's unstoppable* | **v4** — *It's fast* |
+|---|:---:|:---:|:---:|:---:|
+| Photos, videos, music, contacts | ✅ | ✅ | ✅ | ✅ |
+| QR-code pairing over local Wi-Fi | ✅ | ✅ | ✅ | ✅ |
+| Documents & other files | ✋ picked by hand | ✅ found automatically | ✅ | ✅ |
+| Same folders as the old phone | ❌ flattened | ✅ | ✅ | ✅ |
+| Original photo/video dates | ❌ reset to today | ✅ | ✅ | ✅ |
+| SHA-256 checksum on every file | ❌ | ✅ | ✅ | ✅ in background threads |
+| No duplicates on re-runs | ❌ | ✅ index | ✅ index + content check | ✅ |
+| Progress | file count | bytes, %, speed, ETA | live per-file bytes | **every file in flight** |
+| Timeouts & retry queue (DLQ) | ❌ | ❌ | ✅ exponential backoff | ✅ |
+| Pause / resume | ❌ | ❌ | ✅ from the exact byte | ✅ |
+| Survives Wi-Fi drops & app close | ❌ | ❌ | ✅ | ✅ |
+| **Files in flight at once** | 1 | 1 | 1 | **2–6, adapts to your Wi-Fi** |
+| **Small files** | one request each | one request each | one request each | **up to 300 per request** |
+| **Identical files in two folders** | sent twice | sent twice | sent twice | **sent once, copied on the new phone** |
+| **Media index updates** | after every file | after every file | after every file | **in batches** |
+| **Continue without scanning again** | ❌ | ❌ | ❌ | ✅ one tap |
+| **Update mid-transfer** | — | — | — | ✅ from v3, picks up where it paused |
+| End report | counts | per-category table | 🎉 or failed-file list | 🎉 or failed-file list + speed-ups |
 
 > [!NOTE]
-> In short: **v1** proved the idea, **v2** made every copy exact and duplicate-free, and **v3** makes long transfers survive timeouts, Wi-Fi drops, pauses and the app being closed. Full details are in the [CHANGELOG](CHANGELOG.md).
+> In short: **v1** proved the idea, **v2** made every copy exact and duplicate-free, **v3** made long transfers survive timeouts, Wi-Fi drops, pauses and the app being closed, and **v4** makes it **several times faster**, especially for phones full of photos and small files. Full details are in the [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -107,6 +113,14 @@ Press Home, Back, or swipe the app away. The transfer keeps going, with progress
 
 </td>
 </tr>
+<tr>
+<td colspan="2" valign="top">
+
+### ⚡ Fast *(new in v4)*
+**2–6 files in flight at once**, tuned automatically to your Wi-Fi. **Small files travel in batches** of up to 300 per request. **Identical files are sent once** and copied on the new phone. Checksums run in background threads, and Android's media index is updated in batches. Typical gain for a phone full of photos: **3–8× faster than v3**.
+
+</td>
+</tr>
 </table>
 
 ---
@@ -114,13 +128,16 @@ Press Home, Back, or swipe the app away. The transfer keeps going, with progress
 ## ⚡ Quick start
 
 > [!IMPORTANT]
-> Install the **same version** on **both** phones.
+> Install **v4** on **both** phones for full speed. v4 still works with a phone on v3, but then sends one file at a time.
 
-1. **Download** `PhoneTransfer-v3.0.0.apk` from the [v3.0.0 release](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) (or [`apk/`](apk/)) and install it on both phones.
+1. **Download** `PhoneTransfer-v4.0.0.apk` from the [v4.0.0 release](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0) (or [`apk/`](apk/)) and install it on both phones.
 2. **Connect** both phones to the same Wi-Fi. *No Wi-Fi?* Turn on **hotspot on the new phone** and join it from the old one.
 3. **New phone:** open the app → **This is the NEW phone** → allow *All files access*. A QR code appears.
 4. **Old phone:** open the app → **This is the OLD phone** → allow *All files access* → **scan the QR code**.
 5. **Choose** what to send, tap **Start transfer**, and relax. 🎉
+
+> [!TIP]
+> **Fastest setup:** turn on the **new phone's hotspot** (5 GHz if your phone offers it), join it from the old phone, and keep the phones next to each other.
 
 <details>
 <summary><b>📷 Camera not working? Pair manually</b></summary>
@@ -139,6 +156,42 @@ Under the QR code, the new phone shows an **address** (e.g. `192.168.1.5:8765`) 
 1. Open the downloaded `.apk` file on the phone.
 2. If Android asks, allow **Install unknown apps** for your browser or file manager.
 3. If Play Protect warns that the app isn't from the Play Store, tap **More details → Install anyway**.
+
+</details>
+
+---
+
+## ⬆️ Upgrading from v3
+
+**Yes, you can update in the middle of a transfer.** Nothing already sent is re-sent, and a half-sent file continues from the byte where it stopped.
+
+1. On the old phone, tap **⏸ Pause**. (Even if you don't, nothing is lost.)
+2. Install **v4** on **both** phones. It installs over v3 as an update, because it's signed with the same key, and the app's data is kept.
+3. Open the app on both phones: **NEW phone** on one, **OLD phone** on the other.
+4. **Scan the QR code once.** v3 didn't remember the pairing; v4 does, so from now on you'll see **Continue previous transfer** instead.
+5. Tap **Start transfer**. Finished files are skipped, and half-sent files resume from the same byte.
+
+| Kept across the update | How |
+|---|---|
+| Everything already received | v4 reads v3's **index** (and v2's too) |
+| Half-sent files | Same hidden staging folder and same file IDs, so they resume from the exact byte |
+| Your category choices | Pick them again once; v4 remembers them from then on |
+| Retry queue | Not kept (it lived in memory), so those files are simply tried again |
+
+<details>
+<summary><b>Only updated one phone?</b></summary>
+
+<br>
+
+That works too. The QR code stays readable by v3, and both directions are supported:
+
+| Old phone | New phone | What happens |
+|---|---|---|
+| v4 | v4 | ⚡ Fast mode: parallel lanes, batches, cloning |
+| v4 | v3 | Compatibility mode: one file at a time, everything else as in v3 |
+| v3 | v4 | Works exactly like v3 → v3 |
+
+The app shows which mode it's in while sending.
 
 </details>
 
@@ -257,10 +310,12 @@ flowchart LR
         S2[Storage scan<br/>every other file]
         S3[Contacts]
         S1 & S2 & S3 --> P[Plan +<br/>category picker]
-        P --> U[Uploader<br/>SHA-256 while streaming]
+        P --> U[2–6 lanes<br/>big files · batches · clones]
     end
     subgraph NEW["📱 New phone — receiver"]
         H[HTTP server :8765] --> ST[(Staging<br/>.phonetransfer_tmp)]
+        H --> CL[Clone: copy identical<br/>content already here]
+        CL --> D
         ST --> V{SHA-256<br/>matches?}
         V -- yes --> D[Same folder,<br/>same date]
         V -- no --> X[Discard → re-send]
@@ -295,11 +350,11 @@ sequenceDiagram
 ```
 
 <details>
-<summary><b>🔌 Protocol reference (v3)</b></summary>
+<summary><b>🔌 Protocol reference (v4)</b></summary>
 
 <br>
 
-Every request carries the 6-digit pairing code in an `X-Code` header. Both phones must run the same protocol version (`3`).
+Every request carries the 6-digit pairing code in an `X-Code` header. The QR code carries `v: 3` (so v3 phones can still read it) and `max: 4`. `/ping` reports the version actually spoken, and the old phone uses fast mode only when both phones speak `4`.
 
 | Endpoint | Purpose |
 |---|---|
@@ -311,9 +366,43 @@ Every request carries the 6-digit pairing code in an `X-Code` header. Both phone
 | `GET /status?id=` | Bytes already received for a file (for resume) |
 | `POST /upload?id&offset&total&name` | Streams bytes from `offset` into the staging file |
 | `POST /commit` | Verify SHA-256, move into place, restore date, add to index |
+| `POST /batch?count&total` *(v4)* | Many small files in one stream: `[4-byte length][header JSON with SHA-256][bytes]` per file; each is verified and saved as it arrives |
+| `POST /clone` *(v4)* | "You already have this content (SHA-256): copy it to this path" — no bytes sent |
 | `POST /done` | End of session + final failed-file list |
 
 </details>
+
+---
+
+## ⚡ Speed: how v4 goes faster
+
+```mermaid
+flowchart LR
+    Q[Files to send] --> B{size}
+    B -- "over 2 MB" --> L1[Lane 1<br/>large files]
+    B -- "2 MB or less" --> BT[Batches<br/>up to 300 files / 32 MB]
+    BT --> L2[Lane 2]
+    BT --> L3[Lane 3]
+    BT --> LN[Lanes 4–6<br/>added while speed rises]
+    Q -. "same name, size and SHA-256" .-> C[Send once,<br/>clone on the new phone]
+    L1 & L2 & L3 & LN --> N[(New phone)]
+    C --> N
+```
+
+| Technique | What it does | Helps most with |
+|---|---|---|
+| **Parallel lanes** | 3 lanes to start; every 4 s one is added while speed keeps rising (up to 6), and one is removed on stalls or errors (down to 2) | Everything: the Wi-Fi never sits idle waiting for a reply |
+| **Separate lane for large files** | Lane 1 takes files over 2 MB; the others take small-file batches | A 4 GB video no longer blocks thousands of photos queued behind it |
+| **Small-file batches** | Up to 300 files (32 MB) per request instead of ~3 round trips per file | Photos, documents, WhatsApp media |
+| **Duplicate cloning** | Files with the same name, size and SHA-256 are sent once; the new phone copies the others locally | The same picture saved in two folders |
+| **Background checksums** | SHA-256 runs in worker isolates, so the main thread only moves bytes and the screen stays smooth | High speeds |
+| **Batched media indexing** | The new phone tells Android about new files 200 at a time, every 2 s, instead of waiting after each file | Large numbers of files |
+| **1 MB reads** | Fewer, larger socket writes | Large files |
+
+**Not used: compression.** Photos, videos and music are already compressed, so it would only burn CPU and battery.
+
+> [!NOTE]
+> Every v3 guarantee still holds in fast mode. Each file is SHA-256 verified, nothing is duplicated, pause and resume work per file, and a stalled file — even one inside a batch — goes to the retry queue on its own while the rest of its batch carries on.
 
 ---
 
@@ -336,7 +425,7 @@ stateDiagram-v2
 
 | Situation | What the app does |
 |---|---|
-| ⏱️ **A file makes no progress for 20 s** | Aborts it, puts it in the **retry queue**, and moves on to the next file |
+| ⏱️ **A file makes no progress for 20 s** | Aborts it, puts it in the **retry queue**, and moves on to the next file. Inside a batch, only the stuck file is queued; files already saved are kept and the rest of the batch is re-sent |
 | 🔁 **Retry queue** | Runs after all other files, in rounds of **5 s → 10 s → 20 s → 40 s** (±20% jitter), up to **5 attempts** per file |
 | 📶 **The new phone drops off Wi-Fi** | *Not* a file failure: shows "Waiting for the new phone…" and re-checks with backoff (2 s → 4 s → 8 s → 15 s) until it's back |
 | ⏸️ **You press Pause** | Stops mid-file; the 20 s timeout doesn't count while paused |
@@ -359,6 +448,10 @@ stateDiagram-v2
 | Reconnect checks | 2 s, 4 s, 8 s, then every 15 s |
 | Commit timeout | 60 s + 1 s per 20 MB (time to checksum large files) |
 | Quick re-sync on byte mismatch | up to 3 times, then retry queue |
+| Parallel lanes *(v4)* | start 3, min 2, max 6, adjusted every 4 s |
+| Batch size *(v4)* | files ≤ 2 MB, up to 300 files or 32 MB per batch |
+| Duplicate check *(v4)* | files ≥ 64 KB sharing a name and size |
+| Media index updates *(v4)* | every 2 s or 200 files |
 
 </details>
 
@@ -419,12 +512,12 @@ Contacts use their own check: phone numbers (last 10 digits), email addresses, o
 git clone https://github.com/mrajkishor/Android-Phone-Clone.git
 cd Android-Phone-Clone
 flutter pub get
-flutter test                 # 6 end-to-end tests
+flutter test                 # 10 end-to-end tests
 flutter build apk --release  # → build/app/outputs/flutter-apk/app-release.apk
 ```
 
 <details>
-<summary><b>Toolchain used for v3.0.0</b></summary>
+<summary><b>Toolchain used for v4.0.0</b></summary>
 
 <br>
 
@@ -454,10 +547,14 @@ The release APK is signed with the debug key, which is fine for sideloading. Set
 | 4 | A file stalls on the first try | Skipped → retry queue → **recovered after all other files** |
 | 5 | A file vanishes after the scan | Ends in the **final failed list** with its full path and error |
 | 6 | Pause mid-file, then resume | Stays paused (no timeout), **continues from the same byte**, file identical |
+| 7 | QR code compatibility | A v3 phone can still read a v4 QR code; a v4 phone sees version 4 |
+| 8 | 450+ small files, 2 large files, an identical picture in two folders | **Several lanes in flight**, **2+ batches**, the duplicate **cloned** instead of re-sent, every file exact |
+| 9 | Update from v3 mid-transfer | v2/v3 index records honoured; a half-sent v3 file **resumes from byte 1,000,000**; nothing duplicated |
+| 10 | New phone still on v3 | v4 falls back to **one file at a time** and still copies everything exactly |
 
 ```bash
 flutter test
-# 00:04 +6: All tests passed!
+# 00:07 +10: All tests passed!
 ```
 
 ---
@@ -482,8 +579,9 @@ lib/
 └── transfer/
     ├── protocol.dart               # Categories, pairing, SHA-256 streaming, formatting
     ├── scanner.dart                # Finds and classifies every file (background isolate)
-    ├── sender.dart                 # Upload engine: resume, watchdog, retry queue, pause
-    ├── receiver.dart               # HTTP server: staging, verify, index, contacts
+    ├── sender.dart                 # Upload engine: lanes, batches, resume, watchdog, retry queue
+    ├── receiver.dart               # HTTP server: staging, verify, index, batches, clones, contacts
+    ├── session_store.dart          # Remembers the last transfer for one-tap "Continue"
     └── native.dart                 # Bridge to Android (storage, media index, service)
 android/app/src/main/kotlin/com/example/phone_transfer/
 ├── App.kt                          # Owns the Flutter engine → survives app close
@@ -491,7 +589,7 @@ android/app/src/main/kotlin/com/example/phone_transfer/
 ├── NativeBridge.kt                 # Storage roots, media index, file dates, service control
 └── TransferService.kt              # Foreground service + notification + wake/Wi-Fi locks
 test/transfer_test.dart             # End-to-end tests
-apk/PhoneTransfer-v3.0.0.apk        # Ready-to-install build
+apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongside)
 ```
 
 </details>
@@ -502,13 +600,14 @@ apk/PhoneTransfer-v3.0.0.apk        # Ready-to-install build
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| [**v3.0.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) · *latest* | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running | **~16 min** |
+| [**v4.0.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0) · *latest* | Fast | 2–6 adaptive lanes, small-file batches, duplicate cloning, background checksums, batched media indexing, one-tap Continue, update from v3 mid-transfer | **~15 min** |
+| [v3.0.0](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running | **~16 min** |
 | v2.0.0 | Exact | Automatic file detection, same folders & dates, SHA-256, index, contact dedupe | **~14 min** |
 | v1.0.0 | It works | Photos, videos, music, contacts, hand-picked files over Wi-Fi with QR pairing | **~43 min** |
 
 ### ⏱️ How long it took
 
-The whole app went from idea to v3 release on **8 November 2026**, built in conversation between [@mrajkishor](https://github.com/mrajkishor) and Claude. Times are measured from each request to the finished, installable APK (IST):
+The whole app went from idea to v4 release on **8 November 2026**, built in conversation between [@mrajkishor](https://github.com/mrajkishor) and Claude. Times are measured from each request to the finished, installable APK (IST):
 
 | Version | Requested | APK ready | Build time | What the time went into |
 |---|:---:|:---:|:---:|---|
@@ -516,6 +615,7 @@ The whole app went from idea to v3 release on **8 November 2026**, built in conv
 | **v2.0.0** | 15:20 | 15:34 | **~14 min** | Automatic file detection, checksum + commit protocol, index, same folders & dates, contact dedupe, new screens, first end-to-end tests. *Preceded by a ~15 min review of v1 (from 15:03) that found the gaps v2 fixes* |
 | **v3.0.0** | 15:49 | 16:05 | **~16 min** | Resumable uploads, stall watchdog, retry queue with backoff, pause/resume, reconnect, background service, live per-file progress, 3 new tests |
 | **Repo & docs** | 16:57 | 17:15 | **~18 min** | This repository, README, CHANGELOG, release notes and the release workflow |
+| **v4.0.0** | 17:50 | 18:04 | **~15 min** | Parallel adaptive lanes, small-file batches, duplicate cloning, background checksums, batched media indexing, v3 compatibility both ways, update-mid-transfer, one-tap Continue, 4 new tests |
 
 ```mermaid
 gantt
@@ -531,9 +631,11 @@ gantt
     Build v3                  :done, v3, 15:49, 16m
     section Repo
     GitHub repo + docs        :done, gh, 16:57, 18m
+    section v4
+    Build v4                  :done, v4, 17:50, 15m
 ```
 
-> **Total hands-on build time: ~1 h 31 min** (v1 + v2 + v3 + repo). The gaps in between were spent discussing requirements and reviewing each version.
+> **Total hands-on build time: ~1 h 46 min** (v1 + v2 + v3 + repo + v4). The gaps in between were spent discussing requirements and reviewing each version.
 
 Full details: **[CHANGELOG.md](CHANGELOG.md)**
 
@@ -548,12 +650,12 @@ Full details: **[CHANGELOG.md](CHANGELOG.md)**
 
 | Role | Traditional estimate | Actual |
 |---|---|---|
-| Senior Flutter developer | 6 weeks | 😴 on leave (didn't need to come back) |
-| Android native developer (Kotlin, services, MediaStore) | 2 weeks | 🏖️ still at the beach |
-| Intern | 6 weeks, mostly asking "why is Gradle red?" | 🎓 promoted to *Chief APK Installer* (2 phones, 1 tap each) |
-| QA engineer | 1.5 weeks | 🤖 replaced by 6 tests that pass while you sip chai |
+| Senior Flutter developer | 7.5 weeks | 😴 on leave (didn't need to come back) |
+| Android native developer (Kotlin, services, MediaStore) | 3 weeks | 🏖️ still at the beach |
+| Intern | 7.5 weeks, mostly asking "why is Gradle red?" and "what's an isolate?" | 🎓 promoted to *Chief APK Installer* (2 phones, 1 tap each) |
+| QA engineer | 2 weeks | 🤖 replaced by 10 tests that pass while you sip chai |
 | Technical writer | 3 days | 📝 this README wrote itself (with help) |
-| Scrum master | 30 stand-ups × 15 min | 🪑 the chair is still warm |
+| Scrum master | 38 stand-ups × 15 min | 🪑 the chair is still warm |
 | **Product owner / boss / visionary** | — | 👑 **[@mrajkishor](https://github.com/mrajkishor), very much employed** |
 
 **Jobs actually lost: 0.** The intern was reassigned to holding both phones during testing, which is honestly the most important job here. 📱🤲📱
@@ -566,36 +668,37 @@ Full details: **[CHANGELOG.md](CHANGELOG.md)**
 | v2.0.0 — *It's exact* | ~120 h | 14 min |
 | v3.0.0 — *It's unstoppable* | ~160 h | 16 min |
 | Repo, README, CHANGELOG, release | ~24 h | 18 min |
-| **Total** | **~384 person-hours** (≈ 10 work-weeks) | **~1 h 31 min** |
+| v4.0.0 — *It's fast* | ~120 h | 15 min |
+| **Total** | **~504 person-hours** (≈ 12.5 work-weeks) | **~1 h 46 min** |
 
-That's roughly **250× faster**, or, put another way, Claude finished three versions before a typical team would have finished arguing about whether to use `provider` or `riverpod`.
+That's roughly **285× faster**, or, put another way, Claude finished four versions before a typical team would have finished arguing about whether to use `provider` or `riverpod`.
 
 ### 💰 Money saved
 
 | Line item | Old-school cost (₹) |
 |---|---:|
-| Senior Flutter dev — 240 h × ₹1,200 | 2,88,000 |
-| Android native dev — 80 h × ₹1,200 | 96,000 |
-| Intern — 240 h × ₹150 | 36,000 |
-| QA — 60 h × ₹600 | 36,000 |
+| Senior Flutter dev — 300 h × ₹1,200 | 3,60,000 |
+| Android native dev — 120 h × ₹1,200 | 1,44,000 |
+| Intern — 300 h × ₹150 | 45,000 |
+| QA — 80 h × ₹600 | 48,000 |
 | Tech writer — 24 h × ₹800 | 19,200 |
-| Chai ☕ (4 people × 2 cups × 50 days × ₹15) | 6,000 |
-| Samosas for "quick sync" meetings 🥟 | 4,500 |
-| Emergency pizza on release night 🍕 | 3,200 |
-| **Total** | **≈ ₹4,89,000** *(≈ US$ 5,800)* |
+| Chai ☕ (4 people × 2 cups × 63 days × ₹15) | 7,560 |
+| Samosas for "quick sync" meetings 🥟 | 5,600 |
+| Emergency pizza on release nights (×2) 🍕 | 6,400 |
+| **Total** | **≈ ₹6,36,000** *(≈ US$ 7,500)* |
 | **Actual cost** | **One Claude subscription and a bit of patience** |
 
-### 📊 Where those 10 weeks would *really* have gone
+### 📊 Where those 12.5 weeks would *really* have gone
 
 ```mermaid
-pie title Where 384 hours of traditional dev time goes
-    "Actually writing code" : 96
-    "Fighting Gradle and Android SDK versions" : 72
-    "Meetings that could have been an email" : 58
-    "Searching Stack Overflow" : 50
-    "Waiting for builds" : 40
-    "Chai and samosa breaks" : 38
-    "Asking - works on my phone" : 30
+pie title Where 504 hours of traditional dev time goes
+    "Actually writing code" : 126
+    "Fighting Gradle and Android SDK versions" : 94
+    "Meetings that could have been an email" : 76
+    "Searching Stack Overflow" : 66
+    "Waiting for builds" : 52
+    "Chai and samosa breaks" : 50
+    "Asking - works on my phone" : 40
 ```
 
 ### 🏆 Fun facts from this build
@@ -603,9 +706,10 @@ pie title Where 384 hours of traditional dev time goes
 | Stat | Value |
 |---|---|
 | Lines committed in the first push | ~5,200 |
-| Versions shipped in one afternoon | 3 |
+| Versions shipped in one afternoon | 4 |
 | Gradle build failures defeated | 6 *(Maven rate limit, SDK mismatch, plugin APIs, out of memory… we've seen things)* |
-| End-to-end tests | 6, all passing — every time |
+| End-to-end tests | 10, all passing — every time |
+| Times the internet "dropped" mid-build | 1 *(it hadn't; v4 carried on from the same checkpoint)* |
 | Merge conflicts | 0 |
 | Jira tickets created | 0 |
 | "Can you hop on a quick call?" | 0 |
@@ -624,7 +728,16 @@ pie title Where 384 hours of traditional dev time goes
 
 <br>
 
-It depends on your Wi-Fi. On a typical home router, expect roughly **10–30 MB/s**. The app shows the live speed and time left. Using the new phone's **hotspot** with the phones close together is often fastest.
+It depends on your Wi-Fi. On a typical home router, expect roughly **10–30 MB/s**; on the new phone's **5 GHz hotspot** with the phones close together, often **30–60 MB/s**. At that speed, **50 GB takes about 15–30 minutes**. With v4 on both phones, that holds even for phones full of small files. The app shows the live speed and time left.
+
+</details>
+
+<details>
+<summary><b>Can I update the app in the middle of a transfer?</b></summary>
+
+<br>
+
+Yes, from v3 to v4 and onwards. Pause, install the update on both phones, open the app on both, and continue. See [Upgrading from v3](#%EF%B8%8F-upgrading-from-v3).
 
 </details>
 
@@ -707,11 +820,11 @@ It will appear in the final list with its full path and error. Tap **Copy list**
 </details>
 
 <details>
-<summary><b>"The other phone has a different version of this app"</b></summary>
+<summary><b>"The new phone has an older version of this app"</b></summary>
 
 <br>
 
-Install the same APK (v3.0.0) on both phones.
+v4 works with v3 phones in compatibility mode. This message only appears with much older versions (v1/v2): install v4.0.0 on both phones.
 
 </details>
 
@@ -720,6 +833,7 @@ Install the same APK (v3.0.0) on both phones.
 ## ⚠️ Known limitations
 
 - Android 15 limits this kind of background service to **6 hours per day**.
+- Fast mode needs **v4 on both phones**; with a v3 phone, files go one at a time.
 - Plain HTTP on the local network, protected by the pairing code only. There's no end-to-end encryption yet.
 - A file that changes after the scan (e.g. still downloading) is reported as failed. Scan again to include the new version.
 - Background running and automatic reconnect are designed for real devices and have **not been tested** on physical phones in the automated suite.
