@@ -6,7 +6,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 |---|---|
 | App name | **Phone Clone** |
 | Package (application ID) | `com.mrajkishor.phoneclone` *(permanent: never change it)* |
-| First Play version | **5.1.0** (version code **10**) |
+| First Play version | **5.2.0** (version code **11**) |
 | Target / min SDK | 36 (Android 16) / 24 (Android 7.0) |
 | Format | Android App Bundle (`.aab`), signed with the **upload key** |
 
@@ -21,7 +21,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 - [x] Privacy policy → [`/PRIVACY.md`](../../PRIVACY.md)
 - [x] Store listing text, within Play's character limits → [`listing.md`](listing.md)
 - [x] Ready-to-paste answers for All files access, foreground service, Data safety and other forms → [`declarations.md`](declarations.md)
-- [x] Release `.aab` built and verified (signed with the upload key, version 5.1.0 / code 10)
+- [x] Release `.aab` built and verified (signed with the upload key, version 5.2.0 / code 11)
 
 ## 🧭 When you're ready to launch (your steps)
 
@@ -31,7 +31,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 1. **Create the developer account** at play.google.com/console (US$25 one-time; identity verification).
 2. **Create the app** → name *Phone Clone* → App → Free.
 3. **Play App Signing** → keep the default (*Google generates and protects the app signing key*). Your upload key is the one in `phone-clone-upload.jks`.
-4. **Internal testing** → create a release → upload `PhoneClone-v5.1.0.aab` → add yourself and a few friends → install on two real phones and test a full transfer. Take the **screenshots** here.
+4. **Internal testing** → create a release → upload `PhoneClone-v5.2.0.aab` → add yourself and a few friends → install on two real phones and test a full transfer. Take the **screenshots** here.
 5. **App content** → fill in every form using [`declarations.md`](declarations.md). The **All files access**, **foreground service** and **SMS / call log** forms each need a short screen recording.
 
 > [!WARNING]

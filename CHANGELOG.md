@@ -5,6 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.2.0](#520--2026-11-08) | Thumbnails and app names in Files; Extras that agree on both phones, with Try again | 5 | ✅ | ~30 min |
 | [5.1.0](#510--2026-11-08) | Never re-sends what's already there; grouped Files tab; restricted items marked | 5 | ✅ | ~25 min |
 | [5.0.0](#500--2026-11-08) | Everything: messages, call history, calendar, apps, wallpaper, ringtones; Files and Extras tabs | 5 (talks 3–4) | ✅ over 4.1+ (Phone Clone) | ~45 min |
 | [4.0.0](#400--2026-11-08) | Fast: parallel lanes, batches, duplicate cloning; works with v3 phones | 4 (talks 3) | ✅ even mid-transfer | ~15 min |
@@ -15,6 +16,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 > v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [5.2.0] — 2026-11-08
+
+### Changed
+- **Files tab rows are easier to read**:
+  - A thumbnail on every row: the photo itself, a frame of the video, the app's own icon, or a coloured icon for the file type (PDF, Word, Excel, slides, e-book, contact card…).
+  - App installers show the **app's name and icon** instead of `base.apk`. The subtitle says *App installer* or *Extra part (arm64_v8a)*. They're read from the APK, so the new phone shows them too.
+  - The status is a small icon on the right. In *By folder*, installed apps form one **Installed apps** group.
+- **Extras** are clearer cards: an icon, the Restricted / Sensitive label, a plain status (*Copying… 320 of 840*, *Waiting · starts after all files are copied*, *Waiting · goes before the files*, *Tap “Allow” in the popup on this phone*, *Done, but 1 couldn't be added*, *Skipped* with the reason), the counts, and a progress bar while copying.
+
+### Added
+- **Try again** for a skipped or partly failed extra, on both phones:
+  - On the old phone it works any time, during or after the transfer, and runs alongside the files.
+  - On the new phone it works while the transfer is running (the old phone picks it up within seconds); afterwards the card says to tap *Try again* on the old phone.
+  - A skipped permission is asked again; anything already added is never added twice.
+
+### Fixed
+- **Call history (and calendar) kept spinning on the new phone** after the old phone showed them as done. The old phone now reports how each extra ended, and when the transfer ends, nothing is left "in progress".
+- 1 test extended: Skip on the new phone, then Try again from the old phone; both phones show the same state (**14 tests**).
 
 ## [5.1.0] — 2026-11-08
 

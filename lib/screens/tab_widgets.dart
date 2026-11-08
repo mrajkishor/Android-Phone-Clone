@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../transfer/extras.dart';
+import 'file_visuals.dart';
 import '../transfer/protocol.dart';
 
 /// Progress / Files / Extras, on both phones.
@@ -48,7 +49,8 @@ class FileRow {
   final String status; // sent | saved | already | cloned | waiting | sending | queued | failed | restricted
   final String? error;
   final Category? category; // null: restricted or unknown
-  const FileRow(this.rel, this.size, this.status, {this.error, this.category});
+  final String? path; // where the file is on this phone (for thumbnails), if it is here
+  const FileRow(this.rel, this.size, this.status, {this.error, this.category, this.path});
 }
 
 enum _Filter { all, onNew, sent, already, pending, failed, restricted }
@@ -94,7 +96,7 @@ class _StackBar extends StatelessWidget {
         height: height,
         child: total == 0
             ? ColoredBox(color: Theme.of(context).colorScheme.surfaceContainerHighest)
-            : Row(children: [
+            : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 for (final b in _Bucket.values)
                   if ((counts[b] ?? 0) > 0) Expanded(flex: counts[b]!, child: ColoredBox(color: _bucketColor(b))),
               ]),
@@ -183,10 +185,15 @@ class _FileCompareListState extends State<FileCompareList> {
         final c = r.status == 'restricted' ? null : r.category;
         final key = c?.name ?? (r.status == 'restricted' ? 'restricted' : 'unknown');
         return groups.putIfAbsent(
-            key, () => _Group(key, c?.label ?? (r.status == 'restricted' ? 'Restricted by Android' : 'Other'), _categoryIcon(c)));
+            key,
+            () => _Group(
+                key, c?.label ?? (r.status == 'restricted' ? 'Restricted by Android' : 'Other'), _categoryIcon(c)));
       case _GroupBy.folder:
         final i = r.rel.indexOf('/');
-        var top = i < 0 ? '(main folder)' : r.rel.substring(0, i);
+        var top = i < 0 ? 'Main folder' : r.rel.substring(0, i);
+        if (r.rel.startsWith('PhoneClone/Apps/')) {
+          return groups.putIfAbsent('apps', () => _Group('apps', 'Installed apps', Icons.apps));
+        }
         if (top == 'Android' || top == 'PhoneClone') {
           // Android/media/com.whatsapp, PhoneClone/Apps: one level deeper is more useful.
           final parts = r.rel.split('/');
@@ -197,7 +204,10 @@ class _FileCompareListState extends State<FileCompareList> {
         final b = _bucketOf(r.status);
         return groups.putIfAbsent(
             b.name,
-            () => _Group(b.name, _bucketLabel(b), switch (b) {
+            () => _Group(
+                b.name,
+                _bucketLabel(b),
+                switch (b) {
                   _Bucket.onNew => Icons.check_circle_outline,
                   _Bucket.pending => Icons.schedule,
                   _Bucket.failed => Icons.error_outline,
@@ -247,7 +257,8 @@ class _FileCompareListState extends State<FileCompareList> {
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (widget.note != null) Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(widget.note!, style: t.bodySmall)),
+      if (widget.note != null)
+        Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(widget.note!, style: t.bodySmall)),
       // Overall picture.
       _StackBar(totals, height: 12),
       const SizedBox(height: 4),
@@ -262,11 +273,12 @@ class _FileCompareListState extends State<FileCompareList> {
       ]),
       const SizedBox(height: 8),
       SegmentedButton<_GroupBy>(
-        showSelectedIcon: false,
+        showSelectedIcon: true,
+        style: const ButtonStyle(visualDensity: VisualDensity.compact),
         segments: const [
-          ButtonSegment(value: _GroupBy.type, label: Text('By type'), icon: Icon(Icons.category_outlined)),
-          ButtonSegment(value: _GroupBy.folder, label: Text('By folder'), icon: Icon(Icons.folder_outlined)),
-          ButtonSegment(value: _GroupBy.status, label: Text('By status'), icon: Icon(Icons.rule)),
+          ButtonSegment(value: _GroupBy.type, label: Text('Type')),
+          ButtonSegment(value: _GroupBy.folder, label: Text('Folder')),
+          ButtonSegment(value: _GroupBy.status, label: Text('Status')),
         ],
         selected: {_groupBy},
         onSelectionChanged: (v) => setState(() {
@@ -321,6 +333,7 @@ class _FileCompareListState extends State<FileCompareList> {
     final open = _open.contains(g.key);
     final n = g.rows.length;
     final done = g.counts[_Bucket.onNew]!;
+    final onlyRestricted = g.counts[_Bucket.restricted] == n;
     return InkWell(
       onTap: () => setState(() => open ? _open.remove(g.key) : _open.add(g.key)),
       child: Padding(
@@ -332,17 +345,19 @@ class _FileCompareListState extends State<FileCompareList> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Row(children: [
                 Expanded(child: Text(g.title, style: t.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                Text('$done/$n', style: t.labelMedium),
+                if (!onlyRestricted) Text('$done/$n', style: t.labelMedium),
               ]),
               const SizedBox(height: 4),
               _StackBar(g.counts),
               const SizedBox(height: 2),
               Text(
-                [
-                  '$n files • ${formatBytes(g.bytes)}',
-                  for (final b in _Bucket.values)
-                    if (g.counts[b]! > 0 && b != _Bucket.onNew) '${g.counts[b]} ${_bucketLabel(b).toLowerCase()}',
-                ].join(' • '),
+                onlyRestricted
+                    ? '$n ${n == 1 ? 'item' : 'items'} • can’t be copied by any app'
+                    : [
+                        '$n ${n == 1 ? 'file' : 'files'} • ${formatBytes(g.bytes)}',
+                        for (final b in _Bucket.values)
+                          if (g.counts[b]! > 0 && b != _Bucket.onNew) '${g.counts[b]} ${_bucketLabel(b).toLowerCase()}',
+                      ].join(' • '),
                 style: t.bodySmall,
               ),
             ]),
@@ -355,29 +370,53 @@ class _FileCompareListState extends State<FileCompareList> {
 
   Widget _row(FileRow r) {
     final (icon, color, label) = _look(r.status);
+    final apps = r.rel.startsWith('PhoneClone/Apps/');
     final slash = r.rel.lastIndexOf('/');
+    final where = apps
+        ? FileTitle.partName(r.rel.split('/').last)
+        : slash < 0
+            ? 'Main folder'
+            : r.rel.substring(0, slash);
     return ListTile(
       dense: true,
-      contentPadding: const EdgeInsets.only(left: 36, right: 8),
-      leading: Icon(icon, color: color, size: 20),
-      title: Text(slash < 0 ? r.rel : r.rel.substring(slash + 1), maxLines: 1, overflow: TextOverflow.ellipsis),
+      contentPadding: const EdgeInsets.only(left: 12, right: 8),
+      leading: FileThumb(rel: r.rel, path: r.path, category: r.status == 'restricted' ? null : r.category),
+      title: FileTitle(rel: r.rel, path: r.path),
       subtitle: Text(
-        '${slash < 0 ? '' : '${r.rel.substring(0, slash)} • '}${r.size > 0 ? '${formatBytes(r.size)} • ' : ''}$label'
-        '${r.error == null ? '' : '\n${r.error}'}',
-        maxLines: r.error == null ? 1 : 4,
+        [where, if (r.size > 0) formatBytes(r.size), if (r.error != null) r.error!].join(' • '),
+        maxLines: r.error == null ? 1 : 3,
         overflow: TextOverflow.ellipsis,
       ),
+      trailing: Tooltip(message: label, child: Icon(icon, color: color, size: 20)),
     );
   }
 }
 
-/// Messages, calls, calendar, apps, wallpaper and ringtones.
+/// Messages, calls, calendar, apps, wallpaper and ringtones: one card each, with a
+/// plain-language status and, where it helps, a "Try again" button.
 class ExtrasStatusList extends StatelessWidget {
   final Map<Extra, ExtraTally> tally;
   final Iterable<Extra> shown;
   final List<Widget> footer;
 
-  const ExtrasStatusList({super.key, required this.tally, required this.shown, this.footer = const []});
+  /// True on the new phone (changes the wording of "waiting for Allow").
+  final bool newPhone;
+
+  /// Try a skipped or partly failed extra again (null: not possible from this phone right now).
+  final void Function(Extra e)? onRetry;
+
+  /// Shown instead of the button when [onRetry] is null but trying again is possible elsewhere.
+  final String? retryHint;
+
+  const ExtrasStatusList({
+    super.key,
+    required this.tally,
+    required this.shown,
+    this.footer = const [],
+    this.newPhone = false,
+    this.onRetry,
+    this.retryHint,
+  });
 
   static IconData iconOf(Extra e) => switch (e) {
         Extra.messages => Icons.sms_outlined,
@@ -388,39 +427,109 @@ class ExtrasStatusList extends StatelessWidget {
         Extra.ringtones => Icons.music_note_outlined,
       };
 
+  /// Calendar, calls and messages go before the files; the rest need the files first.
+  static bool _afterFiles(Extra e) => e == Extra.apps || e == Extra.wallpaper || e == Extra.ringtones;
+
   @override
   Widget build(BuildContext context) {
     final items = shown.toList();
-    return ListView(children: [
+    return ListView(padding: const EdgeInsets.only(bottom: 16), children: [
       if (items.isEmpty)
         const Padding(
           padding: EdgeInsets.all(24),
-          child: Text('No extras in this transfer. Messages, call history, calendar, apps, wallpaper and ringtones '
-              'can be chosen on the old phone before starting.'),
+          child: Text('Nothing extra in this transfer. Messages, call history, calendar, apps, wallpaper and '
+              'ringtones can be chosen on the old phone before starting.'),
         ),
-      for (final e in items) _row(context, e, tally[e]!),
+      for (final e in items) _card(context, e, tally[e]!),
       ...footer,
     ]);
   }
 
-  Widget _row(BuildContext context, Extra e, ExtraTally t) {
-    final (Widget trailing, String state) = switch (t.state) {
-      'running' => (const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)), 'In progress'),
-      'waiting' => (const Icon(Icons.touch_app, color: Colors.orange), 'Waiting for an OK on the new phone'),
-      'done' => (Icon(t.failed > 0 ? Icons.info : Icons.check_circle, color: t.failed > 0 ? Colors.orange : Colors.green), 'Done'),
-      'skipped' => (const Icon(Icons.block, color: Colors.grey), 'Skipped'),
-      _ => (const Icon(Icons.schedule, color: Colors.grey), 'Waiting'),
+  Widget _card(BuildContext context, Extra e, ExtraTally t) {
+    final cs = Theme.of(context).colorScheme;
+    final txt = Theme.of(context).textTheme;
+    final processed = t.added + t.existing + t.failed;
+    final canRetry = t.state == 'skipped' || (t.state == 'done' && t.failed > 0);
+
+    final (Widget badge, String headline) = switch (t.state) {
+      'running' => (
+          const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+          t.total > 0 ? 'Copying… $processed of ${t.total}' : 'Copying…'
+        ),
+      'waiting' => (
+          const Icon(Icons.touch_app, color: Colors.orange),
+          newPhone ? 'Tap “Allow” in the popup on this phone' : 'Waiting for you to tap “Allow” on the new phone'
+        ),
+      'done' when t.failed > 0 => (
+          const Icon(Icons.error_outline, color: Colors.orange),
+          'Done, but ${t.failed} couldn’t be added'
+        ),
+      'done' => (const Icon(Icons.check_circle, color: Colors.green), 'Done'),
+      'skipped' => (Icon(Icons.do_not_disturb_on_outlined, color: cs.outline), 'Skipped'),
+      _ => (
+          Icon(Icons.schedule, color: cs.outline),
+          _afterFiles(e) ? 'Waiting · starts after all files are copied' : 'Waiting · goes before the files'
+        ),
     };
-    final numbers = t.total == 0 && t.added == 0
-        ? ''
-        : '${t.added} added • ${t.existing} already there${t.failed > 0 ? ' • ${t.failed} failed' : ''}'
-            '${t.total > 0 ? ' • of ${t.total}' : ''}\n';
-    return ListTile(
-      leading: Icon(iconOf(e)),
-      title: Row(children: [Flexible(child: Text(e.label)), if (e.restriction != null) ...[const SizedBox(width: 6), RestrictedChip(e)]]),
-      subtitle: Text('$numbers$state${t.note == null ? '' : ' — ${t.note}'}'),
-      isThreeLine: numbers.isNotEmpty,
-      trailing: trailing,
+
+    final numbers = [
+      if (t.added > 0 || t.state == 'done') '${t.added} added',
+      if (t.existing > 0) '${t.existing} already there',
+      if (t.failed > 0) '${t.failed} not added',
+    ].join(' · ');
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: cs.secondaryContainer,
+              child: Icon(iconOf(e), color: cs.onSecondaryContainer, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  Text(e.label, style: txt.titleSmall),
+                  if (e.restriction != null) RestrictedChip(e),
+                ]),
+                const SizedBox(height: 2),
+                Text(headline, style: txt.bodyMedium),
+                if (numbers.isNotEmpty) Text(numbers, style: txt.bodySmall),
+                if (t.note != null) Text(t.note!, style: txt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            badge,
+          ]),
+          if (t.state == 'running' && t.total > 0) ...[
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: (processed / t.total).clamp(0.0, 1.0),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+          if (canRetry && (onRetry != null || retryHint != null))
+            Align(
+              alignment: Alignment.centerRight,
+              child: onRetry != null
+                  ? TextButton.icon(
+                      onPressed: () => onRetry!(e),
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Try again'),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(retryHint!, style: txt.bodySmall),
+                    ),
+            ),
+        ]),
+      ),
     );
   }
 }

@@ -20,7 +20,7 @@
 </div>
 
 > [!TIP]
-> **Newest build: Phone Clone 5.1.0** → [`apk/PhoneClone-v5.1.0.apk`](apk/PhoneClone-v5.1.0.apk). Now also moves **messages, call history, calendar, installed apps, wallpaper and ringtones**, with new **Files** and **Extras** tabs to compare the old phone with the new one. This is the Google Play edition (package `com.mrajkishor.phoneclone`). It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
+> **Newest build: Phone Clone 5.2.0** → [`apk/PhoneClone-v5.2.0.apk`](apk/PhoneClone-v5.2.0.apk). Now also moves **messages, call history, calendar, installed apps, wallpaper and ringtones**, with new **Files** and **Extras** tabs to compare the old phone with the new one. This is the Google Play edition (package `com.mrajkishor.phoneclone`). It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
 
 ---
 
@@ -656,7 +656,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| **v5.1.0** · *newest build* | Polish | Skips files already on the new phone even after a reinstall; **grouped Files tab** (type / folder / status) with bars; **Restricted** items marked; WhatsApp *Transfer chats* | **~25 min** |
+| **v5.2.0** · *newest build* | Clarity | Thumbnails and app names/icons in the Files tab; Extras cards with plain status and **Try again** on both phones; no stuck spinners | **~30 min** |
+| v5.1.0 | Polish | Skips files already on the new phone even after a reinstall; **grouped Files tab** (type / folder / status) with bars; **Restricted** items marked; WhatsApp *Transfer chats* | **~25 min** |
 | v5.0.0 | Everything | Messages, call history, calendar, installed apps, wallpaper, ringtones, contact groups, WhatsApp guidance; **Progress / Files / Extras** tabs on both phones | **~45 min** |
 | v4.2.2 | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
 | v4.2.1 | Fix | *Looking for identical files* shows real progress and can be skipped | **~5 min** |

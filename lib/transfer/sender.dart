@@ -949,14 +949,18 @@ class SenderService extends ChangeNotifier {
   Future<bool> _newPhoneReady(Extra e) async {
     final t = extraTally[e]!;
     final deadline = DateTime.now().add(const Duration(minutes: 5));
+    var fresh = true; // first ask: the new phone starts this extra's counts from zero
     while (!_cancel) {
       await _waitIfPaused();
-      final r = await _requestReliably('POST', '/x/prepare', body: {'kind': e.name}) as Map;
+      final r = await _requestReliably('POST', '/x/prepare', body: {'kind': e.name, 'fresh': fresh}) as Map;
+      fresh = false;
       if (r['ready'] == true) return true;
       if (r['denied'] == true || DateTime.now().isAfter(deadline)) {
         t
           ..state = 'skipped'
-          ..note = r['denied'] == true ? 'Not allowed on the new phone' : 'No answer on the new phone';
+          ..note = r['denied'] == true
+              ? '“Skip” was tapped on the new phone. Tap Try again to be asked again.'
+              : 'Nobody tapped “Allow” on the new phone within 5 minutes. Tap Try again.';
         return false;
       }
       t.state = 'waiting';
@@ -967,11 +971,37 @@ class SenderService extends ChangeNotifier {
     return false;
   }
 
-  Future<void> _sendExtra(Extra e, SendPlan plan) async {
-    final t = extraTally[e]!;
+  /// Extras being sent right now (one at a time each; a retry may overlap the main run).
+  final Set<Extra> extrasBusy = {};
+  SendPlan? _lastPlan;
+
+  /// The new phone runs v5 or later, so extras can be (re)sent.
+  bool get canSendExtras => receiverVersion >= 5 && _lastPlan != null;
+
+  /// "Try again" for a skipped or partly failed extra. Works while the transfer is
+  /// running (it runs alongside the files) and after it has finished.
+  Future<void> retryExtra(Extra e) async {
+    final plan = _lastPlan;
+    if (plan == null || extrasBusy.contains(e) || !canSendExtras) return;
+    extraTally[e] = ExtraTally()..note = 'Trying again…';
+    selectedExtras.add(e);
+    _tick(force: true);
+    await _sendExtra(e, plan, retry: true);
+  }
+
+  Future<void> _sendExtra(Extra e, SendPlan plan, {bool retry = false}) async {
+    if (!extrasBusy.add(e)) return;
+    var t = extraTally[e]!;
     final scan = plan.extrasScan;
     try {
-      if (e.needsNewPhonePermission && !await _newPhoneReady(e)) return;
+      if (e.needsNewPhonePermission) {
+        if (!await _newPhoneReady(e)) return;
+      } else {
+        // Apps, wallpaper: no permission needed; just reset the new phone's counts.
+        await _requestReliably('POST', '/x/prepare', body: {'kind': e.name, 'fresh': true});
+      }
+      t = extraTally[e]!;
+      t.note = null;
       t.state = 'running';
       statusLine = 'Sending ${e.label.toLowerCase()}…';
       _tick(force: true);
@@ -1003,7 +1033,9 @@ class SenderService extends ChangeNotifier {
           await _requestReliably('POST', '/x/apps', body: {'apps': [for (final a in arrived) a.toJson()]});
           t.added = arrived.length;
           t.failed = apps.length - arrived.length;
-          t.note = 'Install them from the Extras tab on the new phone';
+          t.note = t.failed > 0
+              ? 'Ready to install on the new phone (Extras tab). ${t.failed} didn’t finish copying: use “Try the failed files again” on the Progress tab.'
+              : 'Ready to install: open the Extras tab on the new phone and tap Install.';
         case Extra.wallpaper:
           for (final lock in [false, true]) {
             final bytes = await NativeExtras.readWallpaper(lock: lock);
@@ -1020,14 +1052,23 @@ class SenderService extends ChangeNotifier {
       }
       t.state = 'done';
     } on _CancelSignal {
-      rethrow;
+      if (!retry) rethrow;
+      t.state = 'skipped';
     } on _Busy {
-      rethrow;
+      if (!retry) rethrow;
+      t
+        ..state = 'skipped'
+        ..note = 'Another transfer is sending to the new phone. Try again when it has finished.';
     } catch (err) {
       t
         ..state = 'skipped'
-        ..note = _describe(err);
+        ..note = '${_describe(err)}. Tap Try again.';
     } finally {
+      extrasBusy.remove(e);
+      // Tell the new phone how it ended, so both phones show the same thing.
+      try {
+        await _requestReliably('POST', '/x/finish', body: {'kind': e.name, ...t.toJson()});
+      } catch (_) {}
       _tick(force: true);
     }
   }
@@ -1086,7 +1127,14 @@ class SenderService extends ChangeNotifier {
     if (_heartbeatBusy) return;
     _heartbeatBusy = true;
     try {
-      await _request('POST', '/state', body: _snapshot(), timeout: const Duration(seconds: 4));
+      final r = await _request('POST', '/state', body: _snapshot(), timeout: const Duration(seconds: 4));
+      // "Try again" tapped on the new phone.
+      if (r is Map && r['retry'] is List) {
+        for (final name in (r['retry'] as List).cast<String>()) {
+          final e = Extra.values.where((x) => x.name == name).firstOrNull;
+          if (e != null && !extrasBusy.contains(e)) unawaited(retryExtra(e));
+        }
+      }
     } catch (_) {
       // best effort
     } finally {
@@ -1138,6 +1186,7 @@ class SenderService extends ChangeNotifier {
       ..clear()
       ..addEntries([for (final f in plan.files) MapEntry(f.key, FileOutcome(f, 'waiting'))]);
     selectedExtras = Set.of(plan.extras);
+    _lastPlan = plan;
     for (final e in Extra.values) {
       extraTally[e] = ExtraTally();
     }

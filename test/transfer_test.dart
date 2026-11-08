@@ -554,13 +554,16 @@ void main() {
     });
 
     final r = await startReceiver();
-    // The user taps "Allow" when the new phone asks (messages need the default-SMS role).
+    // The new phone asks before restoring messages (default-SMS role). The user first
+    // taps "Skip", then changes their mind and taps "Try again" on the old phone.
     final asked = <Extra>[];
+    var answering = false;
     r.addListener(() {
       final e = r.pendingPrompt;
-      if (e != null && !asked.contains(e)) {
+      if (e != null && !answering) {
+        answering = true;
         asked.add(e);
-        r.answerPrompt(e, true);
+        r.answerPrompt(e, asked.length > 1).whenComplete(() => answering = false);
       }
     });
     final (s, base) = await prepareSender(r);
@@ -574,6 +577,19 @@ void main() {
     await s.run(plan);
     expect(s.phase, SendPhase.done, reason: '${s.fatalError}');
     expect(asked, [Extra.messages], reason: 'only what is not yet allowed is asked for');
+    expect(s.extraTally[Extra.messages]!.state, 'skipped');
+    expect(r.extraTally[Extra.messages]!.state, 'skipped', reason: 'both phones agree');
+    expect(written['sms'], isNull);
+    for (final e in [Extra.calendar, Extra.calls, Extra.apps, Extra.wallpaper, Extra.ringtones]) {
+      expect(r.extraTally[e]!.state, 'done', reason: '$e: no spinner left on the new phone');
+      expect(s.extraTally[e]!.state, 'done', reason: '$e on the old phone');
+    }
+
+    // "Try again" after the transfer: asked again, allowed this time.
+    await s.retryExtra(Extra.messages);
+    expect(asked, [Extra.messages, Extra.messages]);
+    expect(s.extraTally[Extra.messages]!.state, 'done');
+    expect(r.extraTally[Extra.messages]!.state, 'done');
     expect(written['calendar'], hasLength(1));
     expect(written['calls'], hasLength(2));
     expect(written['sms'], hasLength(2));
@@ -628,12 +644,12 @@ void main() {
     await tester.pump();
     expect(find.text('a.jpg'), findsOneWidget);
 
-    await tester.tap(find.text('By folder'));
+    await tester.tap(find.text('Folder'));
     await tester.pump();
     expect(find.text('DCIM'), findsOneWidget);
     expect(find.text('Android/data'), findsOneWidget);
 
-    await tester.tap(find.text('By status'));
+    await tester.tap(find.text('Status'));
     await tester.pump();
     expect(find.text('Failed'), findsWidgets);
     await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Restricted 1'));

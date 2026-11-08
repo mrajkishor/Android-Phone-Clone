@@ -113,6 +113,17 @@ class NativeExtras {
     return (r['ok'] == true, r['message'] as String?);
   }
 
+  // ---- thumbnails (both phones) ----
+  /// {package, label, versionName, icon (PNG)} from an APK file, or null for a split part.
+  static Future<Map<String, dynamic>?> apkMeta(String path) async {
+    final v = await _c.invokeMethod('apkMeta', {'path': path});
+    return v == null ? null : _map(v);
+  }
+
+  static Future<Uint8List?> appIcon(String package) => _c.invokeMethod<Uint8List>('appIcon', {'package': package});
+  static Future<Uint8List?> videoThumb(String path, {int size = 160}) =>
+      _c.invokeMethod<Uint8List>('videoThumb', {'path': path, 'size': size});
+
   static Future<void> openPlayStore(String package) => _c.invokeMethod('openPlayStore', {'package': package});
 }
 

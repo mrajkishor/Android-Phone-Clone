@@ -42,7 +42,8 @@ class SessionFile {
   final int size;
   final String status; // saved | already | cloned
   final Category category;
-  SessionFile(this.rel, this.size, this.status, this.category);
+  final String path; // where it is on this phone
+  SessionFile(this.rel, this.size, this.status, this.category, this.path);
 }
 
 class ReceivedFile {
@@ -537,7 +538,7 @@ class ReceiverService extends ChangeNotifier {
             hb['bytesDone'] = _maxBytesDone;
             sender = hb;
           }
-          reply = {'ok': true};
+          reply = {'ok': true, if (retryRequested.isNotEmpty) 'retry': [for (final e in retryRequested) e.name]};
         case '/contacts':
           reply = await _importContacts((await _json(req) as List).cast<Map>());
         case '/status':
@@ -564,7 +565,11 @@ class ReceiverService extends ChangeNotifier {
             reply = {'status': result};
           }
         case '/x/prepare' when v5:
-          reply = await _prepare(Extra.values.byName((await _json(req) as Map)['kind'] as String));
+          final body = await _json(req) as Map;
+          reply = await _prepare(Extra.values.byName(body['kind'] as String), fresh: body['fresh'] == true);
+        case '/x/finish' when v5:
+          _finishExtra((await _json(req) as Map).cast<String, dynamic>());
+          reply = {'ok': true};
         case '/x/calendar' when v5:
           reply = await _writeExtra(Extra.calendar, 'writeCalendar', {'events': (await _json(req) as Map)['events']});
         case '/x/calls' when v5:
@@ -598,6 +603,12 @@ class ReceiverService extends ChangeNotifier {
               await _tmp.create();
             } catch (_) {}
           }
+          for (final t in extraTally.values) {
+            // Nothing is in progress any more once the old phone says it is done.
+            if (t.state == 'running') t.state = 'done';
+            if (t.state == 'waiting') t.state = 'skipped';
+          }
+          pendingPrompt = null;
           phase = ReceivePhase.done;
           _activeTransfer = null; // the next transfer may start
           inFlight.clear();
@@ -943,7 +954,7 @@ class ReceiverService extends ChangeNotifier {
 
   void _noteFile(String rel, String path, int size, String status, Category category) {
     _pathByRel[rel] = path;
-    if (sessionFiles.length < 50000) sessionFiles.add(SessionFile(rel, size, status, category));
+    if (sessionFiles.length < 50000) sessionFiles.add(SessionFile(rel, size, status, category, path));
     if (isWhatsAppBackup(rel)) whatsappBackup = true;
   }
 
@@ -965,7 +976,13 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> _prepare(Extra e) async {
+  Future<Map<String, dynamic>> _prepare(Extra e, {bool fresh = false}) async {
+    if (fresh) {
+      // A new attempt (first time or "Try again"): count from zero and ask again if it was skipped.
+      extraTally[e] = ExtraTally();
+      if (_permission[e] == 'denied') _permission.remove(e);
+      retryRequested.remove(e);
+    }
     if (await extraAllowed(e)) {
       _permission[e] = 'granted';
       if (pendingPrompt == e) pendingPrompt = null;
@@ -976,6 +993,36 @@ class ReceiverService extends ChangeNotifier {
     pendingPrompt = e;
     extraTally[e]!.state = 'waiting';
     return {'ready': false};
+  }
+
+  /// The old phone reports how an extra ended; both phones then show the same state.
+  void _finishExtra(Map<String, dynamic> m) {
+    final e = Extra.values.byName(m['kind'] as String);
+    final t = extraTally[e]!;
+    final state = m['state'] as String? ?? 'done';
+    t.state = state == 'running' || state == 'waiting' ? 'done' : state;
+    if (t.state == 'skipped') {
+      t.note = _permission[e] == 'denied'
+          ? '“Skip” was tapped here. Tap Try again to be asked again.'
+          : (m['note'] as String?);
+    } else if (e != Extra.apps) {
+      t.note = null;
+    }
+    if (pendingPrompt == e) pendingPrompt = null;
+    _tick(force: true);
+  }
+
+  /// Extras the user wants to try again from this phone; the old phone picks them up
+  /// with its next status update.
+  final Set<Extra> retryRequested = {};
+
+  void requestRetry(Extra e) {
+    retryRequested.add(e);
+    _permission.remove(e);
+    extraTally[e]!
+      ..state = 'pending'
+      ..note = 'Asking the old phone to try again…';
+    _tick(force: true);
   }
 
   /// The user answered the popup on this phone.

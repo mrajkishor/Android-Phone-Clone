@@ -409,7 +409,7 @@ class _SendBodyState extends State<_SendBody> {
     final s = _sender!;
     final progress = _busy || s.phase == SendPhase.idle ? _buildRunning() : _buildResult();
     final rows = [
-      for (final o in s.outcomes.values) FileRow(o.file.rel, o.file.size, o.status, error: o.error, category: o.file.category),
+      for (final o in s.outcomes.values) FileRow(o.file.rel, o.file.size, o.status, error: o.error, category: o.file.category, path: o.file.path),
       for (final x in _scan?.restricted ?? const <RestrictedItem>[]) FileRow(x.rel, 0, 'restricted', error: x.reason),
     ];
     final failed = rows.where((r) => r.status == 'failed').length;
@@ -423,6 +423,8 @@ class _SendBodyState extends State<_SendBody> {
       extras: ExtrasStatusList(
         tally: s.extraTally,
         shown: [for (final e in Extra.values) if (s.selectedExtras.contains(e)) e],
+        onRetry: s.canSendExtras ? s.retryExtra : null,
+        retryHint: 'Update the new phone to Phone Clone 5 or later, then start the transfer again.',
       ),
       filesBadge: failed,
       extrasBadge: waitingExtra ? 1 : 0,

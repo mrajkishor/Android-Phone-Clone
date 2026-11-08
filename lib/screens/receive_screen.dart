@@ -112,7 +112,7 @@ extension on _ReceiveBodyState {
   Widget _tabs(Widget progress) {
     final s = _service;
     final rows = [
-      for (final f in s.sessionFiles) FileRow(f.rel, f.size, f.status, category: f.category),
+      for (final f in s.sessionFiles) FileRow(f.rel, f.size, f.status, category: f.category, path: f.path),
       for (final f in s.finalFailures) FileRow('${f['rel']}', 0, 'failed', error: '${f['error']}'),
     ];
     final fromOld = ((s.sender['extras'] as Map?) ?? const {}).keys.toSet();
@@ -128,7 +128,13 @@ extension on _ReceiveBodyState {
             ? 'Files that arrived in this transfer. ${s.alreadyBeforeStart} more were already here and were not sent again.'
             : 'Files that arrived in this transfer.',
       ),
-      extras: ExtrasStatusList(tally: s.extraTally, shown: shown, footer: [
+      extras: ExtrasStatusList(
+          tally: s.extraTally,
+          shown: shown,
+          newPhone: true,
+          onRetry: s.phase == ReceivePhase.receiving && !s.senderLost ? s.requestRetry : null,
+          retryHint: 'To try again, tap “Try again” on the old phone.',
+          footer: [
         if (s.smsRoleToHandBack)
           Card(
             color: Theme.of(context).colorScheme.tertiaryContainer,

@@ -140,6 +140,11 @@ class ExtrasBridge(private val ctx: Context) {
                 setRingtone(call.argument<String>("type")!!, call.argument<String>("path"), call.argument<String>("title"))
             }
 
+            // ---------------- thumbnails for the Files tab ----------------
+            "apkMeta" -> bg(result) { apkMeta(call.argument<String>("path")!!) }
+            "appIcon" -> bg(result) { appIcon(call.argument<String>("package")!!) }
+            "videoThumb" -> bg(result) { videoThumb(call.argument<String>("path")!!, call.argument<Int>("size") ?: 160) }
+
             else -> return false
         }
         return true
@@ -633,6 +638,47 @@ class ExtrasBridge(private val ctx: Context) {
         d.setBounds(0, 0, bmp.width, bmp.height)
         d.draw(Canvas(bmp))
         return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+    }
+
+    // ======================= thumbnails =======================
+
+    private fun drawablePng(d: android.graphics.drawable.Drawable, size: Int = 96): ByteArray {
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, size, size)
+        d.draw(Canvas(bmp))
+        return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+    }
+
+    /** Name, package and icon of an app, read from its APK file (works before it is installed). */
+    private fun apkMeta(path: String): Map<String, Any?>? {
+        val pm = ctx.packageManager
+        @Suppress("DEPRECATION")
+        val info = pm.getPackageArchiveInfo(path, 0) ?: return null
+        val app = info.applicationInfo ?: return null
+        app.sourceDir = path
+        app.publicSourceDir = path
+        return mapOf(
+            "package" to info.packageName,
+            "label" to pm.getApplicationLabel(app).toString(),
+            "versionName" to info.versionName,
+            "icon" to try { drawablePng(pm.getApplicationIcon(app)) } catch (_: Exception) { null },
+        )
+    }
+
+    private fun appIcon(pkg: String): ByteArray? = try {
+        drawablePng(ctx.packageManager.getApplicationIcon(pkg))
+    } catch (_: Exception) { null }
+
+    private fun videoThumb(path: String, size: Int): ByteArray? {
+        val bmp = try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                android.media.ThumbnailUtils.createVideoThumbnail(File(path), android.util.Size(size, size), null)
+            } else {
+                @Suppress("DEPRECATION")
+                android.media.ThumbnailUtils.createVideoThumbnail(path, MediaStore.Images.Thumbnails.MINI_KIND)
+            }
+        } catch (_: Exception) { null } ?: return null
+        return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
     }
 
     // ======================= ringtones =======================
