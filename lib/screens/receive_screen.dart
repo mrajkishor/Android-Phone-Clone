@@ -124,9 +124,7 @@ extension on _ReceiveBodyState {
       progress: progress,
       files: FileCompareList(
         rows: rows,
-        note: s.alreadyBeforeStart > 0
-            ? 'Files that arrived in this transfer. ${s.alreadyBeforeStart} more were already here and were not sent again.'
-            : 'Files that arrived in this transfer.',
+        note: 'Files from the old phone: copied in this transfer, or already here from before (not sent again).',
       ),
       extras: ExtrasStatusList(
           tally: s.extraTally,

@@ -611,6 +611,9 @@ void main() {
     // Again: nothing new; the Files tab shows "already there".
     await s.run(plan);
     expect(s.outcomes.values.map((o) => o.status).toSet(), {'already'});
+    expect(r.sessionFiles, hasLength(plan.files.length), reason: 'the new phone lists them too');
+    expect(r.sessionFiles.map((f) => f.status).toSet(), {'already'});
+    expect(r.sessionFiles.every((f) => File(f.path).existsSync()), isTrue, reason: 'with their place on this phone');
 
     // A new phone that is still on v4 just skips the extras.
     s.dispose();

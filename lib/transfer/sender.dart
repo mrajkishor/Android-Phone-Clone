@@ -509,7 +509,7 @@ class SenderService extends ChangeNotifier {
     for (var i = 0; i < files.length && !_cancel; i += 1000) {
       final chunk = files.sublist(i, min(i + 1000, files.length));
       final res = await _requestReliably('POST', '/check', body: {
-        'items': [for (final f in chunk) {'key': f.key, 'size': f.size}],
+        'items': [for (final f in chunk) {'key': f.key, 'size': f.size, 'cat': f.category.name}],
       }) as Map;
       present.addAll((res['present'] as List).cast<String>());
     }

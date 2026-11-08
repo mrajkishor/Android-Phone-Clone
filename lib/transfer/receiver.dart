@@ -224,6 +224,7 @@ class ReceiverService extends ChangeNotifier {
 
   /// Files of this session in arrival order (Files tab).
   final List<SessionFile> sessionFiles = [];
+  final Map<String, SessionFile> _checkedAlready = {}; // found here by /check, before /hello
   final Map<String, String> _pathByRel = {}; // rel on the old phone -> where it was saved here
 
   /// Messages, call history, calendar, apps, wallpaper, ringtones (Extras tab).
@@ -438,11 +439,12 @@ class ReceiverService extends ChangeNotifier {
     _indexSink?.writeln(jsonEncode({'key': key, 'path': path, 'sha': sha}));
   }
 
-  bool _alreadyHave(String key, int size) {
+  /// Where this file already is on this phone, or null.
+  String? _havePath(String key, int size) {
     final m = _index[key];
     if (m != null) {
       final f = File(m.path);
-      if (f.existsSync() && f.lengthSync() == size) return true;
+      if (f.existsSync() && f.lengthSync() == size) return m.path;
     }
     return _onDisk(key, size);
   }
@@ -450,24 +452,24 @@ class ReceiverService extends ChangeNotifier {
   /// No record of this file (app reinstalled, data cleared, or received by the
   /// older "Phone Transfer" app): look where it would have been saved. Same
   /// size and same modified time (restored on every copy) means it is there.
-  bool _onDisk(String key, int size) {
+  String? _onDisk(String key, int size) {
     final a = key.lastIndexOf('|');
     final b = a <= 0 ? -1 : key.lastIndexOf('|', a - 1);
-    if (b <= 0) return false;
+    if (b <= 0) return null;
     final rel = _safeRel(key.substring(0, b));
     final mtime = int.tryParse(key.substring(a + 1));
-    if (mtime == null) return false;
+    if (mtime == null) return null;
     for (final path in [p.join(_root.path, rel), p.join(_root.path, 'PhoneTransfer', rel)]) {
       try {
         final st = FileStat.statSync(path);
         if (st.type == FileSystemEntityType.file &&
             st.size == size &&
             (st.modified.millisecondsSinceEpoch - mtime).abs() <= 2000) {
-          return true;
+          return path;
         }
       } catch (_) {}
     }
-    return false;
+    return null;
   }
 
   // ---------------- HTTP ----------------
@@ -512,15 +514,23 @@ class ReceiverService extends ChangeNotifier {
           reply = {'ok': true, 'v': debugProtocolVersion};
         case '/check':
           final body = await _json(req) as Map;
-          reply = {
-            'present': [
-              for (final i in (body['items'] as List).cast<Map>())
-                if (_alreadyHave(i['key'] as String, i['size'] as int)) i['key'],
-            ],
-          };
+          final present = <String>[];
+          for (final i in (body['items'] as List).cast<Map>()) {
+            final key = i['key'] as String, size = i['size'] as int;
+            final path = _havePath(key, size);
+            if (path == null) continue;
+            present.add(key);
+            // Listed in the Files tab as "Already there" (the check comes just before /hello).
+            final rel = key.substring(0, key.lastIndexOf('|', key.lastIndexOf('|') - 1));
+            final cat = Category.values.where((c) => c.name == i['cat']).firstOrNull ?? Category.otherFiles;
+            _checkedAlready[key] = SessionFile(rel, size, 'already', cat, path);
+          }
+          reply = {'present': present};
         case '/hello':
           final body = await _json(req) as Map;
           _resetSession();
+          sessionFiles.addAll(_checkedAlready.values.take(50000));
+          _checkedAlready.clear();
           expectedFiles = body['files'] as int;
           expectedBytes = body['bytes'] as int;
           expectedContacts = body['contacts'] as int;
