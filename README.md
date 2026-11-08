@@ -7,7 +7,7 @@
 [![Release](https://img.shields.io/badge/release-v4.0.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Tests](https://img.shields.io/badge/tests-10%20passing-brightgreen?style=for-the-badge)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-11%20passing-brightgreen?style=for-the-badge)](#-testing)
 [![No cloud](https://img.shields.io/badge/cloud-none-lightgrey?style=for-the-badge)](#-privacy--safety)
 
 **[⬇️ Download the APK](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0)** ·
@@ -18,6 +18,9 @@
 [Changelog](CHANGELOG.md)
 
 </div>
+
+> [!TIP]
+> **Newest build: Phone Clone 4.2.0** → [`apk/PhoneClone-v4.2.0.apk`](apk/PhoneClone-v4.2.0.apk). This is the Google Play edition (package `com.mrajkishor.phoneclone`), with one-tap reconnect after a dropped connection. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
 
 ---
 
@@ -549,7 +552,7 @@ Contacts use their own check: phone numbers (last 10 digits), email addresses, o
 git clone https://github.com/mrajkishor/Android-Phone-Clone.git
 cd Android-Phone-Clone
 flutter pub get
-flutter test                 # 10 end-to-end tests
+flutter test                 # 11 end-to-end tests
 flutter build apk --release  # → build/app/outputs/flutter-apk/app-release.apk
 ```
 
@@ -588,10 +591,11 @@ The release APK is signed with the debug key, which is fine for sideloading. Set
 | 8 | 450+ small files, 2 large files, an identical picture in two folders | **Several lanes in flight**, **2+ batches**, the duplicate **cloned** instead of re-sent, every file exact |
 | 9 | Update from v3 mid-transfer | v2/v3 index records honoured; a half-sent v3 file **resumes from byte 1,000,000**; nothing duplicated |
 | 10 | New phone still on v3 | v4 falls back to **one file at a time** and still copies everything exactly |
+| 11 | Old phone vanishes mid-file and the new phone's address changes | New phone shows *connection lost* with the **new address, same code**; reconnecting via the fresh QR **resumes** and completes exactly |
 
 ```bash
 flutter test
-# 00:07 +10: All tests passed!
+# 00:09 +11: All tests passed!
 ```
 
 ---
@@ -637,6 +641,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
+| **v4.2.0** · *newest build* | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
+| v4.1.0 | Play-ready | Renamed **Phone Clone** (`com.mrajkishor.phoneclone`), upload-key signing, new icon, privacy policy, Play launch kit | **~16 min** |
 | [**v4.0.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0) · *latest* | Fast | 2–6 adaptive lanes, small-file batches, duplicate cloning, background checksums, batched media indexing, one-tap Continue, update from v3 mid-transfer | **~15 min** |
 | [v3.0.0](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running | **~16 min** |
 | v2.0.0 | Exact | Automatic file detection, same folders & dates, SHA-256, index, contact dedupe | **~14 min** |
@@ -653,6 +659,8 @@ The whole app went from idea to v4 release on **8 November 2026**, built in conv
 | **v3.0.0** | 15:49 | 16:05 | **~16 min** | Resumable uploads, stall watchdog, retry queue with backoff, pause/resume, reconnect, background service, live per-file progress, 3 new tests |
 | **Repo & docs** | 16:57 | 17:15 | **~18 min** | This repository, README, CHANGELOG, release notes and the release workflow |
 | **v4.0.0** | 17:50 | 18:04 | **~15 min** | Parallel adaptive lanes, small-file batches, duplicate cloning, background checksums, batched media indexing, v3 compatibility both ways, update-mid-transfer, one-tap Continue, 4 new tests |
+| **v4.1.0** | 18:12 | 18:28 | **~16 min** | Play readiness check, rename to Phone Clone, upload key and signing, icon and feature graphic, privacy policy, store listing and declarations |
+| **v4.2.0** | 19:29 | 19:38 | **~10 min** | One-tap reconnect after the old phone (hotspot) switched off during a real test: address and Show QR on the new phone, connection-lost view, Continue → scanner, 1 new test |
 
 ```mermaid
 gantt
@@ -670,9 +678,11 @@ gantt
     GitHub repo + docs        :done, gh, 16:57, 18m
     section v4
     Build v4                  :done, v4, 17:50, 15m
+    Play prep v4.1            :done, v41, 18:12, 16m
+    Reconnect v4.2            :done, v42, 19:29, 10m
 ```
 
-> **Total hands-on build time: ~1 h 46 min** (v1 + v2 + v3 + repo + v4). The gaps in between were spent discussing requirements and reviewing each version.
+> **Total hands-on build time: ~2 h 12 min** (v1 + v2 + v3 + repo + v4 + v4.1 + v4.2). The gaps in between were spent discussing requirements and reviewing each version.
 
 Full details: **[CHANGELOG.md](CHANGELOG.md)**
 
