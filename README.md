@@ -163,13 +163,42 @@ Under the QR code, the new phone shows an **address** (e.g. `192.168.1.5:8765`) 
 
 ## ⬆️ Upgrading from v3
 
-**Yes, you can update in the middle of a transfer.** Nothing already sent is re-sent, and a half-sent file continues from the byte where it stopped.
+**Yes, you can update in the middle of a transfer**, even with the app running in the background. Nothing already sent is re-sent, and the file that was cut off continues from its last byte.
 
-1. On the old phone, tap **⏸ Pause**. (Even if you don't, nothing is lost.)
-2. Install **v4** on **both** phones. It installs over v3 as an update, because it's signed with the same key, and the app's data is kept.
-3. Open the app on both phones: **NEW phone** on one, **OLD phone** on the other.
-4. **Scan the QR code once.** v3 didn't remember the pairing; v4 does, so from now on you'll see **Continue previous transfer** instead.
-5. Tap **Start transfer**. Finished files are skipped, and half-sent files resume from the same byte.
+> [!IMPORTANT]
+> Install v4 on **both** phones, and install on both **before** reopening the app on either.
+
+### What happens when you install the update
+
+Android **closes a running app while it updates it**, even one in the background. So the v3 transfer stops at that moment, and nothing that has arrived is lost:
+
+- Files already saved stay on the new phone and in its **index**.
+- The file that was mid-transfer keeps the bytes it had received in the hidden staging folder.
+
+When you reopen the app it starts on the **home screen** (*This is the NEW phone / OLD phone*), not on the transfer screen.
+
+### Step by step
+
+| # | Old phone | New phone |
+|:-:|---|---|
+| 1 | Tap **⏸ Pause** *(optional, but the cleanest stop)* | — |
+| 2 | Install `PhoneTransfer-v4.0.0.apk` (installs over v3) | Install `PhoneTransfer-v4.0.0.apk` (installs over v3) |
+| 3 | — | Open the app → **This is the NEW phone**. The QR screen shows a **new 6-digit code** (v3 didn't save its code). *All files access* is still granted, so there's no permission screen |
+| 4 | Open the app → **This is the OLD phone**. There's no *Continue previous transfer* card yet (v3 didn't save one), so tap **Scan QR code** and scan the new phone | — |
+| 5 | The phone re-scans its storage (up to a minute). Pick **the same categories as before** and tap **Start transfer** | Shows *Receiving* |
+
+### What you'll see after Start
+
+| On screen | Meaning |
+|---|---|
+| *Checking what is already on the new phone…* | v4 is reading the index that v3 built |
+| **Progress starts again from 0%** | The bar now covers only what's *left*, so your earlier progress isn't redone. It's counted in the next line |
+| *N already on the new phone — skipped* | The files v3 already delivered |
+| *Continued from X MB — the first part had already arrived* | The file that was cut off resumes from its last byte |
+| *Fast mode • 3 in flight…* | Both phones are on v4, so several files move at once |
+| *Contacts: … already there* | If Contacts was selected, existing ones are skipped and not duplicated |
+
+From now on, v4 remembers the pairing. If anything interrupts it again, the old phone shows a one-tap **Continue previous transfer**, with no QR scan needed.
 
 | Kept across the update | How |
 |---|---|
@@ -179,11 +208,16 @@ Under the QR code, the new phone shows an **address** (e.g. `192.168.1.5:8765`) 
 | Retry queue | Not kept (it lived in memory), so those files are simply tried again |
 
 <details>
-<summary><b>Only updated one phone?</b></summary>
+<summary><b>Installed on only one phone first?</b></summary>
 
 <br>
 
-That works too. The QR code stays readable by v3, and both directions are supported:
+| Situation | What you'll see | What to do |
+|---|---|---|
+| **New phone updated first** | The old phone (still v3) shows *Waiting for the new phone…* indefinitely, because the pairing code changed | Install v4 on the old phone too (this closes it), then follow steps 3–5 |
+| **Old phone updated first** | The new phone (still v3) looks frozen on its progress screen | Install v4 on it, then follow steps 3–5 |
+
+Mixed versions also work if you deliberately keep one phone on v3. The QR code stays readable by v3, and both directions are supported:
 
 | Old phone | New phone | What happens |
 |---|---|---|
@@ -194,6 +228,9 @@ That works too. The QR code stays readable by v3, and both directions are suppor
 The app shows which mode it's in while sending.
 
 </details>
+
+> [!NOTE]
+> This upgrade path is covered by an automated test (a half-sent v3 file resumes from byte 1,000,000, and v3's index is honoured). It hasn't yet been tried on physical phones. If a screen doesn't match the tables above, please [open an issue](https://github.com/mrajkishor/Android-Phone-Clone/issues).
 
 ---
 
