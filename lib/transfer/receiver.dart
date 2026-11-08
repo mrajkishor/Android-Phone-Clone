@@ -41,7 +41,8 @@ class SessionFile {
   final String rel;
   final int size;
   final String status; // saved | already | cloned
-  SessionFile(this.rel, this.size, this.status);
+  final Category category;
+  SessionFile(this.rel, this.size, this.status, this.category);
 }
 
 class ReceivedFile {
@@ -438,9 +439,34 @@ class ReceiverService extends ChangeNotifier {
 
   bool _alreadyHave(String key, int size) {
     final m = _index[key];
-    if (m == null) return false;
-    final f = File(m.path);
-    return f.existsSync() && f.lengthSync() == size;
+    if (m != null) {
+      final f = File(m.path);
+      if (f.existsSync() && f.lengthSync() == size) return true;
+    }
+    return _onDisk(key, size);
+  }
+
+  /// No record of this file (app reinstalled, data cleared, or received by the
+  /// older "Phone Transfer" app): look where it would have been saved. Same
+  /// size and same modified time (restored on every copy) means it is there.
+  bool _onDisk(String key, int size) {
+    final a = key.lastIndexOf('|');
+    final b = a <= 0 ? -1 : key.lastIndexOf('|', a - 1);
+    if (b <= 0) return false;
+    final rel = _safeRel(key.substring(0, b));
+    final mtime = int.tryParse(key.substring(a + 1));
+    if (mtime == null) return false;
+    for (final path in [p.join(_root.path, rel), p.join(_root.path, 'PhoneTransfer', rel)]) {
+      try {
+        final st = FileStat.statSync(path);
+        if (st.type == FileSystemEntityType.file &&
+            st.size == size &&
+            (st.modified.millisecondsSinceEpoch - mtime).abs() <= 2000) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
   }
 
   // ---------------- HTTP ----------------
@@ -838,7 +864,7 @@ class ReceiverService extends ChangeNotifier {
       if (await part.exists()) await part.delete();
       tally[category]!.already++;
       filesProcessed++;
-      _noteFile(rel, known.path, size, 'already');
+      _noteFile(rel, known.path, size, 'already', category);
       return 'already';
     }
     try {
@@ -851,7 +877,7 @@ class ReceiverService extends ChangeNotifier {
         tally[category]!.already++;
       }
       filesProcessed++;
-      _noteFile(rel, path, size, status);
+      _noteFile(rel, path, size, status, category);
       recent.insert(0, ReceivedFile(safe, size, status != 'saved'));
       if (recent.length > 6) recent.removeLast();
       return status;
@@ -915,9 +941,9 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
-  void _noteFile(String rel, String path, int size, String status) {
+  void _noteFile(String rel, String path, int size, String status, Category category) {
     _pathByRel[rel] = path;
-    if (sessionFiles.length < 50000) sessionFiles.add(SessionFile(rel, size, status));
+    if (sessionFiles.length < 50000) sessionFiles.add(SessionFile(rel, size, status, category));
     if (isWhatsAppBackup(rel)) whatsappBackup = true;
   }
 

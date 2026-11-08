@@ -112,8 +112,8 @@ extension on _ReceiveBodyState {
   Widget _tabs(Widget progress) {
     final s = _service;
     final rows = [
-      for (final f in s.sessionFiles) FileRow(f.rel, f.size, f.status),
-      for (final f in s.finalFailures) FileRow('${f['rel']}', 0, 'failed', '${f['error']}'),
+      for (final f in s.sessionFiles) FileRow(f.rel, f.size, f.status, category: f.category),
+      for (final f in s.finalFailures) FileRow('${f['rel']}', 0, 'failed', error: '${f['error']}'),
     ];
     final fromOld = ((s.sender['extras'] as Map?) ?? const {}).keys.toSet();
     final shown = [
@@ -140,20 +140,32 @@ extension on _ReceiveBodyState {
             ),
           ),
         if (s.apps.isNotEmpty) _AppsCard(service: s),
-        if (s.whatsappBackup)
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.chat),
-              title: Text('WhatsApp backup copied'),
-              subtitle: Text('Install WhatsApp from the Play Store, verify your number and tap “Restore” '
-                  'when it offers the local backup.'),
-              isThreeLine: true,
-            ),
-          ),
+        _WhatsAppCard(backupCopied: s.whatsappBackup),
       ]),
       extrasBadge: (s.pendingPrompt != null ? 1 : 0) + s.apps.where((a) => a.state == 'ready').length,
     );
   }
+}
+
+/// WhatsApp chats: the built-in "Transfer chats" (recommended), or the local backup.
+class _WhatsAppCard extends StatelessWidget {
+  final bool backupCopied;
+  const _WhatsAppCard({required this.backupCopied});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.chat),
+          title: const Text('WhatsApp chats'),
+          subtitle: Text('Recommended: WhatsApp’s own Transfer chats. Install WhatsApp here, verify your number and '
+              'choose “Transfer from old phone”; on the old phone open WhatsApp → Settings → Chats → '
+              'Transfer chats and scan the code. Same Wi-Fi, Location on, no Google Drive needed.\n\n'
+              '${backupCopied ? 'A local WhatsApp backup was also copied: if WhatsApp offers it during setup, tap Restore. '
+                  'Check its date: an older Google Drive backup may be offered first.' : 'Or: make a local backup on the old phone '
+                  '(Chats → Chat backup → Back up) before the transfer, and restore it here during setup.'}'),
+          isThreeLine: true,
+        ),
+      );
 }
 
 class _AppsCard extends StatelessWidget {

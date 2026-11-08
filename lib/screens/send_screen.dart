@@ -353,17 +353,23 @@ class _SendBodyState extends State<_SendBody> {
               const ListTile(
                 leading: Icon(Icons.chat_outlined),
                 title: Text('WhatsApp chats'),
-                subtitle: Text('Before you start, open WhatsApp → Settings → Chats → Chat backup → Back up. '
-                    'The backup is copied with “Other files”; install WhatsApp on the new phone, '
-                    'verify your number and tap Restore.'),
+                subtitle: Text('Best: WhatsApp’s own Transfer chats, phone to phone, no Google Drive needed. '
+                    'After this transfer: install WhatsApp on the new phone, verify your number, choose '
+                    '“Transfer from old phone”, then here open WhatsApp → Settings → Chats → Transfer chats '
+                    'and scan its code (same Wi-Fi, Location on).\n'
+                    'Or: WhatsApp → Settings → Chats → Chat backup → Back up before starting. The local backup '
+                    'is copied with “Other files” and WhatsApp offers to restore it during setup.'),
                 isThreeLine: true,
               ),
             ],
-            if (scan.unreadable > 0)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('${scan.unreadable} folders or files couldn’t be read (protected by Android).',
-                    style: Theme.of(context).textTheme.bodySmall),
+            if (scan.restricted.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.lock_outline, color: Colors.purple),
+                title: const Text('Restricted by Android'),
+                subtitle: Text('${scan.restricted.length} folders or files can’t be copied by any regular app '
+                    '(apps’ private data in Android/data and Android/obb, protected files). '
+                    'They are listed under “Restricted” in the Files tab.'),
+                isThreeLine: true,
               ),
           ]),
         ),
@@ -388,7 +394,10 @@ class _SendBodyState extends State<_SendBody> {
     final hint = e.needsNewPhonePermission ? '\nThe new phone asks you to allow this during the transfer.' : '';
     return SwitchListTile(
       secondary: Icon(ExtrasStatusList.iconOf(e)),
-      title: Text(e.label),
+      title: Row(children: [
+        Flexible(child: Text(e.label)),
+        if (e.restriction != null) ...[const SizedBox(width: 6), RestrictedChip(e)],
+      ]),
       subtitle: Text(why ?? (n == 0 ? 'Nothing found' : '${x.summary(e)}$hint')),
       isThreeLine: why == null && n > 0,
       value: n > 0 && _selectedExtras.contains(e),
@@ -400,7 +409,8 @@ class _SendBodyState extends State<_SendBody> {
     final s = _sender!;
     final progress = _busy || s.phase == SendPhase.idle ? _buildRunning() : _buildResult();
     final rows = [
-      for (final o in s.outcomes.values) FileRow(o.file.rel, o.file.size, o.status, o.error),
+      for (final o in s.outcomes.values) FileRow(o.file.rel, o.file.size, o.status, error: o.error, category: o.file.category),
+      for (final x in _scan?.restricted ?? const <RestrictedItem>[]) FileRow(x.rel, 0, 'restricted', error: x.reason),
     ];
     final failed = rows.where((r) => r.status == 'failed').length;
     final waitingExtra = s.extraTally.entries.any((e) => s.selectedExtras.contains(e.key) && e.value.state == 'waiting');

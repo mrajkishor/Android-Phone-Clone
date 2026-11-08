@@ -29,6 +29,22 @@ extension ExtraInfo on Extra {
         Extra.apps || Extra.wallpaper => '',
       };
 
+  /// Restricted by Google: Play Protect blocks installs from WhatsApp / a browser of apps
+  /// that ask for these, and Google Play reviews them by hand. Shown as "Restricted".
+  String? get restriction => switch (this) {
+        Extra.messages => 'Restricted by Google: SMS access. Play Protect can block this app when it is '
+            'installed from WhatsApp or a browser, and Google Play allows it only after a manual review '
+            '("Backup and restore" exception). Android also makes Phone Clone the default SMS app for a moment.',
+        Extra.calls => 'Restricted by Google: call-log access. Google Play allows it only after a manual review '
+            '("Backup and restore" exception).',
+        Extra.apps => 'Sensitive: installing apps needs your OK for each one, and a Play declaration '
+            '("Device migration / phone transfer").',
+        _ => null,
+      };
+
+  /// Restricted (red) rather than only sensitive (amber).
+  bool get isRestricted => this == Extra.messages || this == Extra.calls;
+
   /// Restoring this needs a permission on the new phone, asked for during the transfer.
   bool get needsNewPhonePermission => this == Extra.messages || this == Extra.calls || this == Extra.calendar || this == Extra.ringtones;
 }

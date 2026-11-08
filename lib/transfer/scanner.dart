@@ -5,11 +5,21 @@ import 'native.dart';
 import 'protocol.dart';
 
 /// Result of scanning the old phone.
+/// Something on the old phone that Android doesn't let a regular app read.
+class RestrictedItem {
+  final String rel;
+  final String reason;
+  const RestrictedItem(this.rel, this.reason);
+}
+
 class ScanResult {
   final Map<Category, List<FileEntry>> byCategory;
   final int unreadable;
 
-  const ScanResult(this.byCategory, this.unreadable);
+  /// Folders and files that can't be copied, with the reason (shown as "Restricted").
+  final List<RestrictedItem> restricted;
+
+  const ScanResult(this.byCategory, this.unreadable, [this.restricted = const []]);
 
   int count(Category c) => byCategory[c]!.length;
   int bytes(Category c) => byCategory[c]!.fold(0, (s, f) => s + f.size);
@@ -59,6 +69,9 @@ ScanResult _scan(List<String> roots, List<({String path, String kind})> media) {
   final out = {for (final c in Category.values) c: <FileEntry>[]};
   final mediaPaths = <String>{};
   var unreadable = 0;
+  final restricted = <RestrictedItem>[];
+  const privateReason = 'App-private storage. Android lets only the app itself (or the phone maker\'s '
+      'own transfer tool) read it. The app\'s own backup or sign-in restores it.';
 
   // 1. Media index.
   for (final m in media) {
@@ -79,13 +92,32 @@ ScanResult _scan(List<String> roots, List<({String path, String kind})> media) {
       entries = dir.listSync(followLinks: false);
     } catch (_) {
       unreadable++;
+      if (restricted.length < 5000) {
+        final rel = dir.path.length > root.length ? dir.path.substring(root.length + 1) : dir.path;
+        restricted.add(RestrictedItem(rel, 'Folder protected by Android: it can\'t be opened by apps.'));
+      }
       return;
     }
     for (final e in entries) {
       final name = e.path.split('/').last;
       final rel = e.path.substring(root.length + 1);
       if (e is Directory) {
-        if (_isPrivateFolder(rel) || name == '.phonetransfer_tmp') continue;
+        if (_isPrivateFolder(rel)) {
+          // Android 11+: the folder can't be listed at all. Older versions: list the apps in it.
+          List<FileSystemEntity> apps = const [];
+          try {
+            apps = e.listSync(followLinks: false);
+          } catch (_) {}
+          if (apps.isEmpty) {
+            restricted.add(RestrictedItem(rel, privateReason));
+          } else {
+            for (final a in apps) {
+              restricted.add(RestrictedItem(a.path.substring(root.length + 1), privateReason));
+            }
+          }
+          continue;
+        }
+        if (name == '.phonetransfer_tmp') continue;
         walk(e, root, hidden || name.startsWith('.'));
       } else if (e is File) {
         if (mediaPaths.contains(e.path)) continue;
@@ -94,6 +126,7 @@ ScanResult _scan(List<String> roots, List<({String path, String kind})> media) {
           st = e.statSync();
         } catch (_) {
           unreadable++;
+          if (restricted.length < 5000) restricted.add(RestrictedItem(rel, 'Android refused to read this file.'));
           continue;
         }
         final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
@@ -119,5 +152,5 @@ ScanResult _scan(List<String> roots, List<({String path, String kind})> media) {
   for (final r in roots) {
     walk(Directory(r), r, false);
   }
-  return ScanResult(out, unreadable);
+  return ScanResult(out, unreadable, restricted);
 }

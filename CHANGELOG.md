@@ -5,6 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.1.0](#510--2026-11-08) | Never re-sends what's already there; grouped Files tab; restricted items marked | 5 | ✅ | ~25 min |
 | [5.0.0](#500--2026-11-08) | Everything: messages, call history, calendar, apps, wallpaper, ringtones; Files and Extras tabs | 5 (talks 3–4) | ✅ over 4.1+ (Phone Clone) | ~45 min |
 | [4.0.0](#400--2026-11-08) | Fast: parallel lanes, batches, duplicate cloning; works with v3 phones | 4 (talks 3) | ✅ even mid-transfer | ~15 min |
 | [3.0.0](#300--2026-11-08) | Unstoppable: survives timeouts, drops, pauses and the app being closed | 3 | ✅ | ~16 min |
@@ -14,6 +15,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 > v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [5.1.0] — 2026-11-08
+
+### Fixed
+- **Everything was sent again** when the new phone had lost its record of received files, for example after reinstalling Phone Clone, or when the earlier files came from the older *Phone Transfer* app (a different app with its own records). The new phone now also looks on disk: a file with the **same name, size and modified time** where it would be saved counts as already there, and is skipped before any bytes are sent.
+
+### Added
+- **Restricted** items are shown instead of silently skipped:
+  - Files: apps' private folders (`Android/data`, `Android/obb`) and anything Android refuses to read appear on the choose screen and in a **Restricted** group in the Files tab, each with the reason.
+  - Extras: **Messages** and **Call history** carry a red *Restricted* label (Google restricts SMS and call-log access: Play Protect can block sideloaded installs, and Google Play needs a manual review). **Installed apps** carries an amber *Sensitive* label (needs a Play declaration and your OK per app). Tap a label for the reason.
+- **Files tab, grouped**: group **by type**, **by folder** or **by status**; each group has a coloured bar (on new phone / pending / failed / restricted), counts and size, and opens to its files. An overall bar and legend on top; filters and search still work.
+- **WhatsApp**: WhatsApp's own **Transfer chats** (phone to phone, no Google Drive) is now the recommended way, on both phones; the local-backup route stays as the alternative.
+- 1 new test (grouped Files tab at phone width); the reinstall case now checks that no bytes are re-sent (**14 tests**).
 
 ## [5.0.0] — 2026-11-08
 

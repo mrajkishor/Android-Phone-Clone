@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:flutter/material.dart';
+import 'package:phone_transfer/screens/tab_widgets.dart';
 import 'package:phone_transfer/transfer/extras.dart';
 import 'package:phone_transfer/transfer/protocol.dart';
 import 'package:phone_transfer/transfer/receiver.dart';
@@ -134,6 +135,7 @@ void main() {
     expect(rels(Category.otherMedia), 'Music/song.mp3');
     expect(rels(Category.otherFiles), 'WhatsApp/Media/notes.bin');
     expect(rels(Category.hidden), 'Pictures/.thumbnails/t1.jpg');
+    expect(scan.restricted.map((x) => x.rel), ['Android/data/com.app'], reason: 'shown as restricted, not copied');
     expect(expectedFromSetup, isEmpty);
   });
 
@@ -176,6 +178,7 @@ void main() {
     r = await startReceiver();
     (s, plan) = await prepareSender(r);
     await s.run(plan);
+    expect(r.bytesReceived, 0, reason: 'found on disk by name, size and date: nothing is sent again');
     expect(s.filesSent, 0, reason: 'identical files must not be written again');
     expect(s.filesAlready, 9);
     expect(snapshot(newRoot), expectedCopy(before));
@@ -604,5 +607,40 @@ void main() {
     expect(s4.extraTally[Extra.calls]!.state, 'skipped');
     s4.dispose();
     await r4.stop();
+  });
+
+  testWidgets('Files tab: grouped by type, folder and status, with filters', (tester) async {
+    final rows = [
+      const FileRow('DCIM/Camera/a.jpg', 10, 'sent', category: Category.photos),
+      const FileRow('DCIM/Camera/b.jpg', 10, 'already', category: Category.photos),
+      const FileRow('Documents/x.pdf', 10, 'failed', error: 'boom', category: Category.documents),
+      const FileRow('Download/y.zip', 10, 'waiting', category: Category.archives),
+      const FileRow('Android/data/com.app', 0, 'restricted', error: 'App-private storage'),
+    ];
+    tester.view.physicalSize = const Size(1080, 2340); // a phone screen, 360 dp wide
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: FileCompareList(rows: rows))));
+    expect(find.text('Photos'), findsOneWidget);
+    expect(find.text('Restricted by Android'), findsOneWidget);
+    expect(find.text('2/2'), findsOneWidget, reason: 'both photos are on the new phone');
+    await tester.tap(find.text('Photos'));
+    await tester.pump();
+    expect(find.text('a.jpg'), findsOneWidget);
+
+    await tester.tap(find.text('By folder'));
+    await tester.pump();
+    expect(find.text('DCIM'), findsOneWidget);
+    expect(find.text('Android/data'), findsOneWidget);
+
+    await tester.tap(find.text('By status'));
+    await tester.pump();
+    expect(find.text('Failed'), findsWidgets);
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Restricted 1'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Restricted 1'));
+    await tester.pump();
+    expect(find.text('com.app'), findsOneWidget, reason: 'single group opens by itself');
+    expect(tester.takeException(), isNull);
   });
 }

@@ -20,7 +20,7 @@
 </div>
 
 > [!TIP]
-> **Newest build: Phone Clone 5.0.0** → [`apk/PhoneClone-v5.0.0.apk`](apk/PhoneClone-v5.0.0.apk). Now also moves **messages, call history, calendar, installed apps, wallpaper and ringtones**, with new **Files** and **Extras** tabs to compare the old phone with the new one. This is the Google Play edition (package `com.mrajkishor.phoneclone`). It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
+> **Newest build: Phone Clone 5.1.0** → [`apk/PhoneClone-v5.1.0.apk`](apk/PhoneClone-v5.1.0.apk). Now also moves **messages, call history, calendar, installed apps, wallpaper and ringtones**, with new **Files** and **Extras** tabs to compare the old phone with the new one. This is the Google Play edition (package `com.mrajkishor.phoneclone`). It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
 
 ---
 
@@ -270,9 +270,11 @@ Android reserves these for system tools such as Google's setup restore or Samsun
 | Not transferred | Alternative |
 |---|---|
 | App data and logins (inside apps) | Each app's own backup / sign in again; Google account restore |
-| WhatsApp & other in-app chat histories | Make a local backup first (WhatsApp → Chats → Chat backup); Phone Clone copies it, then tap *Restore* in WhatsApp |
+| WhatsApp & other in-app chat histories | WhatsApp's own **Transfer chats** (Settings → Chats → Transfer chats), phone to phone without Google Drive; or a local backup that Phone Clone copies |
 | Wi-Fi passwords, system settings | Google account restore |
-| `Android/data` and `Android/obb` folders | Private to each app by design |
+| `Android/data` and `Android/obb` folders | Private to each app by design. Listed as **Restricted** in the Files tab |
+
+> 🔒 **Restricted** = Android or Google limits it. Messages and call history are marked *Restricted* (Play Protect may block sideloaded installs; Google Play needs a manual review). Installed apps are marked *Sensitive*.
 
 </details>
 
@@ -608,7 +610,7 @@ The release APK is signed with the debug key, which is fine for sideloading. Set
 
 ```bash
 flutter test
-# 00:17 +13: All tests passed!
+# 00:18 +14: All tests passed!
 ```
 
 ---
@@ -654,7 +656,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| **v5.0.0** · *newest build* | Everything | Messages, call history, calendar, installed apps, wallpaper, ringtones, contact groups, WhatsApp guidance; **Progress / Files / Extras** tabs on both phones | **~45 min** |
+| **v5.1.0** · *newest build* | Polish | Skips files already on the new phone even after a reinstall; **grouped Files tab** (type / folder / status) with bars; **Restricted** items marked; WhatsApp *Transfer chats* | **~25 min** |
+| v5.0.0 | Everything | Messages, call history, calendar, installed apps, wallpaper, ringtones, contact groups, WhatsApp guidance; **Progress / Files / Extras** tabs on both phones | **~45 min** |
 | v4.2.2 | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
 | v4.2.1 | Fix | *Looking for identical files* shows real progress and can be skipped | **~5 min** |
 | v4.2.0 | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
