@@ -45,6 +45,7 @@ jobs:
               v5.5.1) title="Phone Clone 5.5.1" ;;
               v5.6.0) title="Phone Clone 5.6.0" ;;
               v5.7.0) title="PhoneHop 5.7.0" ;;
+              v5.8.0) title="PhoneHop 5.8.0" ;;
             esac
             args=(--target "$GITHUB_SHA" --title "$title" --notes-file "$notes")
             [ "$tag" = "$latest" ] && args+=(--latest)

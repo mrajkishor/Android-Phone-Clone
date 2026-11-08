@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'native.dart';
 import 'protocol.dart';
+import 'scanner.dart';
 
 /// The last transfer started on the old phone: which phone it went to and what
 /// was selected. It survives app restarts and updates, so an unfinished
@@ -91,10 +92,29 @@ class SummaryRow {
 class SnapshotApp {
   final String label, package, state; // state: ready | installed | failed | installing
   final String? versionName;
-  const SnapshotApp(this.label, this.package, this.state, this.versionName);
-  Map<String, dynamic> toJson() => {'label': label, 'package': package, 'state': state, 'versionName': versionName};
-  static SnapshotApp fromJson(Map m) =>
-      SnapshotApp(m['label'] as String, m['package'] as String, m['state'] as String, m['versionName'] as String?);
+  final int versionCode;
+  final bool fromPlay;
+  final List<String> paths; // its APK files on the new phone, so it can still be installed
+  const SnapshotApp(this.label, this.package, this.state, this.versionName,
+      {this.versionCode = 0, this.fromPlay = false, this.paths = const []});
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'package': package,
+        'state': state,
+        'versionName': versionName,
+        'versionCode': versionCode,
+        'fromPlay': fromPlay,
+        'paths': paths,
+      };
+  static SnapshotApp fromJson(Map m) => SnapshotApp(
+        m['label'] as String,
+        m['package'] as String,
+        m['state'] as String,
+        m['versionName'] as String?,
+        versionCode: (m['versionCode'] as num? ?? 0).toInt(),
+        fromPlay: m['fromPlay'] == true,
+        paths: [for (final x in (m['paths'] as List? ?? const [])) '$x'],
+      );
 }
 
 /// A read-only snapshot of one transfer: everything the Progress, Files and Extras
@@ -118,6 +138,10 @@ class TransferReport {
   final List<SnapshotApp> apps;
   final String appVersion;
 
+  /// transfer: saved at the end of a transfer · records: rebuilt from this phone's
+  /// record of received files (transfers made before snapshots existed).
+  final String source;
+
   /// Where this snapshot is stored on this phone (null until saved or loaded).
   final String? path;
 
@@ -131,8 +155,47 @@ class TransferReport {
     this.extras = const {},
     this.apps = const [],
     this.appVersion = '',
+    this.source = 'transfer',
     this.path,
   });
+
+  /// Saved by a version that kept only the file list (5.3–5.5), or rebuilt from records.
+  bool get partial => rows.isEmpty || source == 'records';
+
+  /// The per-type table; worked out from the file list when the snapshot doesn't have one.
+  List<SummaryRow> get table {
+    if (rows.isNotEmpty) return rows;
+    final out = <SummaryRow>[];
+    for (final c in Category.values) {
+      final fs = [for (final f in files) if (f.category == c.name) f];
+      if (fs.isEmpty) continue;
+      out.add(SummaryRow(
+        c.label,
+        fs.where((f) => const {'sent', 'saved', 'cloned'}.contains(f.status)).length,
+        fs.where((f) => f.status == 'already').length,
+        fs.where((f) => f.status == 'failed').length,
+      ));
+    }
+    return out;
+  }
+
+  /// Apps that can be installed on the new phone; found from the copied installers when
+  /// the snapshot doesn't list them.
+  List<SnapshotApp> get installableApps {
+    if (sent) return const [];
+    if (apps.isNotEmpty) return apps;
+    final byPkg = <String, List<String>>{};
+    for (final f in files) {
+      final parts = f.rel.split('/');
+      if (parts.length >= 4 && parts[0] == 'PhoneClone' && parts[1] == 'Apps' && f.path != null) {
+        byPkg.putIfAbsent(parts[2], () => []).add(f.path!);
+      }
+    }
+    return [
+      for (final e in byPkg.entries)
+        SnapshotApp(e.key, e.key, 'ready', null, paths: e.value..sort((a, b) => a.endsWith('base.apk') ? -1 : 1)),
+    ];
+  }
 
   int get onNewPhone => files.where((f) => const {'sent', 'saved', 'already', 'cloned'}.contains(f.status)).length;
   int get failed => files.where((f) => f.status == 'failed').length;
@@ -149,6 +212,7 @@ class TransferReport {
         'format': format,
         'version': 1,
         'appVersion': appVersion,
+        'source': source,
         'sent': sent,
         'when': when.millisecondsSinceEpoch,
         'outcome': outcome,
@@ -172,6 +236,7 @@ class TransferReport {
         },
         apps: [for (final a in (m['apps'] as List? ?? const [])) SnapshotApp.fromJson(a as Map)],
         appVersion: m['appVersion'] as String? ?? '',
+        source: m['source'] as String? ?? 'transfer',
         path: path,
       );
 
@@ -187,16 +252,20 @@ class TransferReport {
   static Future<File> _legacy() async =>
       File(p.join((await getApplicationSupportDirectory()).path, 'last_report.json'));
 
-  /// Saves this snapshot as a new file. Existing snapshots are never overwritten.
-  Future<TransferReport?> save() async {
+  /// Saves this snapshot as a new file, or updates [into] (the same transfer's snapshot,
+  /// e.g. after an app was installed from it). Other snapshots are never overwritten.
+  Future<TransferReport?> save({String? into}) async {
     try {
       final dir = await folder();
       await dir.create(recursive: true);
-      var f = File(p.join(dir.path, 'PhoneHop - $name.json'));
-      for (var i = 2; await f.exists(); i++) {
+      var f = File(into ?? p.join(dir.path, 'PhoneHop - $name.json'));
+      for (var i = 2; into == null && await f.exists(); i++) {
         f = File(p.join(dir.path, 'PhoneHop - $name ($i).json'));
       }
-      await f.writeAsString(jsonEncode(toJson()));
+      // Written to a temporary file first, so a reader never sees half a snapshot.
+      final tmp = File('${f.path}.tmp');
+      await tmp.writeAsString(jsonEncode(toJson()));
+      await tmp.rename(f.path);
       return TransferReport.fromJson(toJson(), path: f.path);
     } catch (_) {
       return null;
@@ -233,8 +302,50 @@ class TransferReport {
       final legacy = await _read(await _legacy());
       if (legacy != null) out.add(legacy);
     }
+    // No full snapshot of a received transfer yet (it was made before 5.6): rebuild one
+    // from the new phone's records, once, and keep it with the others.
+    if (!out.any((r) => !r.sent && !r.partial) && !out.any((r) => r.source == 'records')) {
+      final rebuilt = await fromRecords();
+      if (rebuilt != null) {
+        final saved = await rebuilt.save();
+        if (saved != null) out.add(saved);
+      }
+    }
     out.sort((a, b) => b.when.compareTo(a.when));
     return out;
+  }
+
+  /// The new phone's record of every file it received (the index it uses to skip
+  /// duplicates), as a snapshot. Used for transfers made before snapshots existed.
+  static Future<TransferReport?> fromRecords() async {
+    try {
+      final support = (await getApplicationSupportDirectory()).path;
+      final files = <String, ReportFile>{};
+      DateTime? newest;
+      for (final f in [File(p.join(support, 'received_v2.jsonl')), File(p.join(support, 'received_index.jsonl'))]) {
+        if (!await f.exists()) continue;
+        final m = await f.lastModified();
+        if (newest == null || m.isAfter(newest)) newest = m;
+        for (final line in await f.readAsLines()) {
+          try {
+            final j = jsonDecode(line) as Map;
+            final key = j['key'] as String, path = j['path'] as String;
+            final a = key.lastIndexOf('|'), b = key.lastIndexOf('|', a - 1);
+            final rel = key.substring(0, b);
+            final st = FileStat.statSync(path);
+            if (st.type != FileSystemEntityType.file) continue; // deleted since
+            files[path] = ReportFile(rel, st.size, 'saved', category: categoryOfFile(rel).name, path: path);
+          } catch (_) {}
+        }
+      }
+      if (files.isEmpty) return null;
+      return TransferReport(false, newest!, 'done', files.values.toList(),
+          source: 'records', appVersion: kAppVersion,
+          lines: ['Rebuilt from this phone’s record of received files. Counts for contacts, messages and other '
+              'extras weren’t kept by the version that made this transfer.']);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// The newest snapshot, for the home screen.

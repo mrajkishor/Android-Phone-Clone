@@ -56,6 +56,21 @@ bool _isPrivateFolder(String rel) {
   return l == 'android/data' || l == 'android/obb';
 }
 
+/// The type of a file from its name alone (when Android's media index isn't available).
+Category categoryOfFile(String rel) {
+  final name = rel.split('/').last;
+  final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  if (rel.split('/').any((part) => part.startsWith('.'))) return Category.hidden;
+  if (const {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'dng'}.contains(ext)) return Category.photos;
+  if (const {'mp4', 'mkv', 'mov', '3gp', 'webm', 'avi', 'm4v'}.contains(ext)) return Category.videos;
+  if (const {'mp3', 'm4a', 'aac', 'wav', 'ogg', 'opus', 'flac', 'amr'}.contains(ext)) return Category.music;
+  if (_docExt.contains(ext)) return Category.documents;
+  if (_archiveExt.contains(ext)) return Category.archives;
+  if (_appExt.contains(ext)) return Category.apps;
+  if (_mediaExt.contains(ext)) return Category.otherMedia;
+  return Category.otherFiles;
+}
+
 String? _relativeTo(String path, List<String> roots) {
   for (final r in roots) {
     if (path.startsWith('$r/')) return path.substring(r.length + 1);

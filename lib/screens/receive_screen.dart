@@ -133,99 +133,20 @@ extension on _ReceiveBodyState {
           onRetry: s.phase == ReceivePhase.receiving && !s.senderLost ? s.requestRetry : null,
           retryHint: 'To try again, tap “Try again” on the old phone.',
           footer: [
-        if (s.smsRoleToHandBack)
-          Card(
-            color: Theme.of(context).colorScheme.tertiaryContainer,
-            child: ListTile(
-              leading: const Icon(Icons.sms),
-              title: const Text('Messages restored'),
-              subtitle: const Text('Make your usual messaging app the default SMS app again.'),
-              trailing: FilledButton(onPressed: s.handBackSmsRole, child: const Text('Switch back')),
-            ),
-          ),
-        if (s.apps.isNotEmpty) _AppsCard(service: s),
-        _WhatsAppCard(backupCopied: s.whatsappBackup),
-      ]),
+            if (s.smsRoleToHandBack)
+              Card(
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.sms),
+                  title: const Text('Messages restored'),
+                  subtitle: const Text('Make your usual messaging app the default SMS app again.'),
+                  trailing: FilledButton(onPressed: s.handBackSmsRole, child: const Text('Switch back')),
+                ),
+              ),
+            if (s.apps.isNotEmpty) AppsInstallCard(apps: s.apps, onInstall: s.installApp),
+            WhatsAppCard(backupCopied: s.whatsappBackup),
+          ]),
       extrasBadge: (s.pendingPrompt != null ? 1 : 0) + s.apps.where((a) => a.state == 'ready').length,
-    );
-  }
-}
-
-/// WhatsApp chats: the built-in "Transfer chats" (recommended), or the local backup.
-class _WhatsAppCard extends StatelessWidget {
-  final bool backupCopied;
-  const _WhatsAppCard({required this.backupCopied});
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.chat),
-          title: const Text('WhatsApp chats'),
-          subtitle: Text('Recommended: WhatsApp’s own Transfer chats. Install WhatsApp here, verify your number and '
-              'choose “Transfer from old phone”; on the old phone open WhatsApp → Settings → Chats → '
-              'Transfer chats and scan the code. Same Wi-Fi, Location on, no Google Drive needed.\n\n'
-              '${backupCopied ? 'A local WhatsApp backup was also copied: if WhatsApp offers it during setup, tap Restore. '
-                  'Check its date: an older Google Drive backup may be offered first.' : 'Or: make a local backup on the old phone '
-                  '(Chats → Chat backup → Back up) before the transfer, and restore it here during setup.'}'),
-          isThreeLine: true,
-        ),
-      );
-}
-
-class _AppsCard extends StatelessWidget {
-  final ReceiverService service;
-  const _AppsCard({required this.service});
-
-  @override
-  Widget build(BuildContext context) {
-    final apps = service.apps;
-    final todo = apps.where((a) => a.state == 'ready' || a.state == 'failed').toList();
-    return Card(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        ListTile(
-          leading: const Icon(Icons.apps),
-          title: Text('${apps.length} ${apps.length == 1 ? 'app' : 'apps'} to install'),
-          subtitle: const Text('Android asks you to confirm each one. App data and logins are not included; '
-              'apps from the Play Store keep updating from there.'),
-          isThreeLine: true,
-        ),
-        if (todo.length > 1)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: FilledButton.icon(
-              onPressed: () async {
-                for (final a in todo) {
-                  await service.installApp(a);
-                }
-              },
-              icon: const Icon(Icons.download_for_offline),
-              label: Text('Install all ${todo.length}'),
-            ),
-          ),
-        for (final a in apps)
-          ListTile(
-            dense: true,
-            title: Text(a.label),
-            subtitle: Text([
-              if (a.versionName != null) 'v${a.versionName}',
-              if (a.fromPlay) 'from Play Store',
-              if (a.message != null && a.state == 'failed') a.message!,
-            ].join(' • ')),
-            trailing: switch (a.state) {
-              'installed' => const Icon(Icons.check_circle, color: Colors.green),
-              'installing' => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-              _ => Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (a.fromPlay)
-                    IconButton(
-                      tooltip: 'Open in Play Store',
-                      icon: const Icon(Icons.shop),
-                      onPressed: () => NativeExtras.openPlayStore(a.package),
-                    ),
-                  TextButton(onPressed: () => service.installApp(a), child: Text(a.state == 'failed' ? 'Retry' : 'Install')),
-                ]),
-            },
-          ),
-      ]),
     );
   }
 }
@@ -366,7 +287,8 @@ class _ProgressView extends StatelessWidget {
                     icon: Icons.replay,
                     color: Colors.orange,
                     title: 'Retrying failed files — round ${st['retryRound']} of ${st['retryRounds']}',
-                    subtitle: st['nextRetryIn'] == null ? 'Retrying now' : 'Next try in ${(st['nextRetryIn'] as int) + 1} s',
+                    subtitle:
+                        st['nextRetryIn'] == null ? 'Retrying now' : 'Next try in ${(st['nextRetryIn'] as int) + 1} s',
                   )
                 : const StatusBanner(
                     icon: Icons.download_rounded,

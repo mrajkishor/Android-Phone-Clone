@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../transfer/extras.dart';
 import '../transfer/native.dart';
 import '../transfer/protocol.dart';
+import '../transfer/receiver.dart' show ReceivedApp, installReceivedApp;
 import '../transfer/session_store.dart';
+import 'file_visuals.dart';
 import 'report_table.dart';
 import 'tab_widgets.dart';
 import 'transfer_widgets.dart';
@@ -123,28 +125,76 @@ class LastTransferCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// One snapshot: Summary / Files / Extras, read-only
+// One snapshot: the same Progress, Files and Extras tabs as during the transfer
 // ---------------------------------------------------------------------------
 
-class SnapshotScreen extends StatelessWidget {
+/// The transfer as it looked on this phone when it ended, with the same three tabs,
+/// without the other phone. Apps can still be installed from it.
+class SnapshotScreen extends StatefulWidget {
   final TransferReport report;
   const SnapshotScreen({super.key, required this.report});
 
-  Future<void> _share(BuildContext context) async {
-    final path = report.path;
-    final ok = path != null && await NativeExtras.shareFile(path, title: 'PhoneHop snapshot · ${report.name}');
-    if (!ok && context.mounted) _say(context, 'Couldn’t share this snapshot.');
+  @override
+  State<SnapshotScreen> createState() => _SnapshotScreenState();
+}
+
+class _SnapshotScreenState extends State<SnapshotScreen> {
+  late final List<ReceivedApp> _apps = [
+    for (final a in widget.report.installableApps)
+      ReceivedApp(a.package, a.label, a.versionName, a.versionCode, a.fromPlay, a.paths)..state = a.state,
+  ];
+  bool _defaultSms = false;
+
+  TransferReport get r => widget.report;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
   }
 
-  Future<void> _showFolder(BuildContext context) async {
-    final path = report.path;
+  /// What's true on this phone now: which apps are installed, whether PhoneHop is
+  /// still the SMS app, and the real app names for apps found from their installers.
+  Future<void> _refresh() async {
+    for (var i = 0; i < _apps.length; i++) {
+      var a = _apps[i];
+      // Found from its installer files only: read the real name from the APK.
+      if (a.label == a.package && a.paths.isNotEmpty) {
+        final look = await FileVisuals.app(a.paths.first);
+        if (look != null) {
+          a = _apps[i] = ReceivedApp(look.package, look.label, look.versionName, a.versionCode, a.fromPlay, a.paths)
+            ..state = a.state;
+        }
+      }
+      try {
+        final v = await NativeExtras.installedVersion(a.package);
+        if (v >= 0 && (a.versionCode == 0 || v >= a.versionCode)) a.state = 'installed';
+      } catch (_) {}
+    }
+    try {
+      _defaultSms = !r.sent && await NativeExtras.isDefaultSmsApp();
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _install(ReceivedApp a) => installReceivedApp(a, () {
+        if (mounted) setState(() {});
+      });
+
+  Future<void> _share() async {
+    final path = r.path;
+    final ok = path != null && await NativeExtras.shareFile(path, title: 'PhoneHop snapshot · ${r.name}');
+    if (!ok && mounted) _say(context, 'Couldn’t share this snapshot.');
+  }
+
+  Future<void> _showFolder() async {
+    final path = r.path;
     final ok = path != null && await NativeExtras.showInFilesApp(path);
-    if (!ok && context.mounted) _say(context, 'Couldn’t open the Files app on this phone.');
+    if (!ok && mounted) _say(context, 'Couldn’t open the Files app on this phone.');
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = report;
     final rows = [
       for (final f in r.files)
         FileRow(
@@ -157,12 +207,13 @@ class SnapshotScreen extends StatelessWidget {
         ),
     ];
     final tally = {
-      for (final e in Extra.values) e: ExtraTally.fromJson(r.extras[e.name] ?? const {'state': 'pending'})
+      for (final e in Extra.values) e: ExtraTally.fromJson(r.extras[e.name] ?? const {'state': 'pending'}),
     };
     final shownExtras = [
       for (final e in Extra.values)
         if (r.extras.containsKey(e.name)) e
     ];
+    final whatsapp = r.files.any((f) => isWhatsAppBackup(f.rel));
     return Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -170,30 +221,51 @@ class SnapshotScreen extends StatelessWidget {
           Text(_when(r.when), style: Theme.of(context).textTheme.bodySmall),
         ]),
         actions: [
+          IconButton(tooltip: 'Export (share)', icon: const Icon(Icons.share_outlined), onPressed: _share),
           IconButton(
-              tooltip: 'Export (share)', icon: const Icon(Icons.share_outlined), onPressed: () => _share(context)),
-          IconButton(
-            tooltip: 'Show in Files app',
-            icon: const Icon(Icons.folder_open_outlined),
-            onPressed: () => _showFolder(context),
-          ),
+              tooltip: 'Show in Files app', icon: const Icon(Icons.folder_open_outlined), onPressed: _showFolder),
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: TransferTabs(
-          progress: _Summary(report: r),
+          progress: _Progress(report: r, onShare: _share, onShowFolder: _showFolder),
           files: FileCompareList(
             rows: rows,
             note: r.sent
-                ? 'Every file chosen on this phone, as it stood when the transfer ended.'
+                ? 'Every file you chose on this phone, and whether it reached the new phone.'
                 : 'Files from the old phone: copied in this transfer, or already here from before.',
           ),
           extras: ExtrasStatusList(
             tally: tally,
             shown: shownExtras,
             newPhone: !r.sent,
-            footer: [if (r.apps.isNotEmpty) _AppsList(apps: r.apps)],
+            emptyText: r.sent
+                ? null
+                : r.partial
+                    ? 'This transfer was made with an older version of PhoneHop, which didn’t keep the results for '
+                        'messages, call history, calendar, wallpaper and ringtones. Apps and WhatsApp are below.'
+                    : null,
+            footer: [
+              if (_defaultSms)
+                Card(
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
+                  child: ListTile(
+                    leading: const Icon(Icons.sms),
+                    title: const Text('PhoneHop is still your SMS app'),
+                    subtitle: const Text('Make your usual messaging app the default SMS app again.'),
+                    trailing: FilledButton(
+                      onPressed: () async {
+                        await NativeExtras.restoreDefaultSmsApp();
+                        await _refresh();
+                      },
+                      child: const Text('Switch back'),
+                    ),
+                  ),
+                ),
+              if (_apps.isNotEmpty) AppsInstallCard(apps: _apps, onInstall: _install),
+              if (!r.sent) WhatsAppCard(backupCopied: whatsapp),
+            ],
           ),
         ),
       ),
@@ -201,9 +273,12 @@ class SnapshotScreen extends StatelessWidget {
   }
 }
 
-class _Summary extends StatelessWidget {
+/// The finished screen of the transfer, as it was.
+class _Progress extends StatelessWidget {
   final TransferReport report;
-  const _Summary({required this.report});
+  final VoidCallback onShare;
+  final VoidCallback onShowFolder;
+  const _Progress({required this.report, required this.onShare, required this.onShowFolder});
 
   @override
   Widget build(BuildContext context) {
@@ -215,71 +290,81 @@ class _Summary extends StatelessWidget {
       for (final f in r.files)
         if (f.status == 'failed') (f.path ?? f.rel, f.error ?? 'Failed')
     ];
+    final copiedMedia = r.files.any((f) =>
+        (f.category == 'photos' || f.category == 'videos') && const {'saved', 'sent', 'cloned'}.contains(f.status));
+    final detail =
+        r.lines.isNotEmpty ? r.lines.first : '${_n(r.onNewPhone)} files on the new phone · ${formatBytes(r.bytes)}.';
     return ListView(children: [
-      Card(
-        elevation: 0,
-        color: cs.secondaryContainer,
-        child: ListTile(
-          leading: Icon(Icons.inventory_2_outlined, color: cs.onSecondaryContainer),
-          title: Text('Snapshot · read-only', style: TextStyle(color: cs.onSecondaryContainer)),
-          subtitle: Text(
-            'Saved on this phone in $snapshotFolderText. It stays there after the other phone is gone '
-            'and even if PhoneHop is uninstalled. Share it with the export button above.',
-            style: TextStyle(color: cs.onSecondaryContainer),
-          ),
+      if (ok)
+        HurrayHeader(detail: detail)
+      else ...[
+        Icon(r.outcome == 'stopped' ? Icons.stop_circle_outlined : Icons.info_rounded, size: 64, color: Colors.orange),
+        const SizedBox(height: 8),
+        Text(
+          switch (r.outcome) {
+            'stopped' => 'Transfer stopped',
+            'interrupted' => 'Transfer interrupted',
+            _ => 'Finished — ${r.failed} file(s) need attention',
+          },
+          style: t.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+        Padding(padding: const EdgeInsets.all(8), child: Text(detail, textAlign: TextAlign.center)),
+      ],
+      const SizedBox(height: 16),
+      ReportTable(rows: [for (final x in r.table) (x.label, x.copied, x.already, x.failed)]),
+      for (final l in r.lines.skip(1)) Padding(padding: const EdgeInsets.only(top: 8), child: Text(l)),
+      if (!r.sent && copiedMedia)
+        const ListTile(
+          leading: Icon(Icons.photo_library_outlined),
+          title: Text('Your albums are here too'),
+          subtitle: Text('Photos and videos are in the same folders as on the old phone. '
+              'In Google Photos, open Collections → On this device to see each folder as an album.'),
           isThreeLine: true,
         ),
-      ),
+      if (r.sent)
+        const ListTile(
+          leading: Icon(Icons.lock_outline),
+          title: Text('Your files on this phone weren’t changed'),
+          subtitle: Text('Files were only read, never moved or deleted.'),
+        ),
+      if (failed.isNotEmpty) ...[const SizedBox(height: 8), FailedFilesCard(items: failed)],
       const SizedBox(height: 16),
-      Icon(ok ? Icons.check_circle : Icons.info_rounded, size: 56, color: ok ? Colors.green : Colors.orange),
-      const SizedBox(height: 8),
-      Text(_outcomeText(r), style: t.headlineSmall, textAlign: TextAlign.center),
-      Text(
-        '${r.sent ? 'Sent from this phone' : 'Received on this phone'} · ${_when(r.when)}'
-        '${r.appVersion.isEmpty ? '' : ' · PhoneHop ${r.appVersion}'}',
-        style: t.bodySmall,
-        textAlign: TextAlign.center,
+      // Where this snapshot is, so it can be found, shared or imported elsewhere.
+      Card(
+        elevation: 0,
+        color: cs.surfaceContainerHigh,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.inventory_2_outlined, size: 20),
+              const SizedBox(width: 8),
+              Text('Saved on this phone', style: t.titleSmall),
+            ]),
+            const SizedBox(height: 6),
+            SelectableText(r.path ?? snapshotFolderText, style: t.bodySmall),
+            const SizedBox(height: 4),
+            Text(
+              'Kept after the other phone is gone, even if PhoneHop is uninstalled.'
+              '${r.source == 'records' ? ' Rebuilt from this phone’s record of received files.' : ''}',
+              style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Row(children: [
+              TextButton.icon(
+                  onPressed: onShare, icon: const Icon(Icons.share_outlined, size: 18), label: const Text('Export')),
+              TextButton.icon(
+                onPressed: onShowFolder,
+                icon: const Icon(Icons.folder_open_outlined, size: 18),
+                label: const Text('Show in Files app'),
+              ),
+            ]),
+          ]),
+        ),
       ),
-      const SizedBox(height: 12),
-      for (final l in r.lines)
-        Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(l, textAlign: TextAlign.center)),
-      const SizedBox(height: 12),
-      if (r.rows.isNotEmpty)
-        ReportTable(rows: [for (final x in r.rows) (x.label, x.copied, x.already, x.failed)])
-      else
-        Text('${_n(r.files.length)} files · ${formatBytes(r.bytes)} · ${_n(r.onNewPhone)} on the new phone',
-            textAlign: TextAlign.center),
-      if (failed.isNotEmpty) ...[const SizedBox(height: 12), FailedFilesCard(items: failed)],
     ]);
   }
 }
-
-class _AppsList extends StatelessWidget {
-  final List<SnapshotApp> apps;
-  const _AppsList({required this.apps});
-
-  @override
-  Widget build(BuildContext context) => Card(
-        elevation: 0,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          ListTile(
-            leading: const Icon(Icons.apps),
-            title: Text('${apps.length} ${apps.length == 1 ? 'app' : 'apps'} from the old phone'),
-            subtitle: const Text('To install the ones still missing, open the Play Store, or start a new transfer.'),
-          ),
-          for (final a in apps)
-            ListTile(
-              dense: true,
-              title: Text(a.label),
-              subtitle: Text([if (a.versionName != null) 'v${a.versionName}', a.package].join(' • ')),
-              trailing: a.state == 'installed'
-                  ? const Icon(Icons.check_circle, color: Colors.green)
-                  : Text('Not installed', style: Theme.of(context).textTheme.bodySmall),
-            ),
-        ]),
-      );
-}
-
 // ---------------------------------------------------------------------------
 // All snapshots
 // ---------------------------------------------------------------------------

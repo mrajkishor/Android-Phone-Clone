@@ -195,6 +195,7 @@ class _SendBodyState extends State<_SendBody> {
     final s = _sender!;
     // Remember this transfer so it can be continued after a restart or an app update.
     await LastSession(s.pairing, Set.of(_selected), _sendContacts, DateTime.now()).save();
+    _snapshotPath = null; // each run gets its own snapshot
     await s.run(_plan!);
     await _saveReport(s);
     if (s.phase == SendPhase.done && s.failedItems.isEmpty && s.contactsFailed == 0) {
@@ -204,8 +205,13 @@ class _SendBodyState extends State<_SendBody> {
 
   /// A read-only snapshot of this transfer (Progress, Files and Extras), kept forever
   /// in Documents/PhoneHop/Snapshots.
-  Future<void> _saveReport(SenderService s) async {
-    await TransferReport(
+  String? _snapshotPath; // this run's snapshot, updated by "Try again"
+
+  Future<void> _saving = Future.value();
+  Future<void> _saveReport(SenderService s) => _saving = _saving.then((_) => _writeSnapshot(s));
+
+  Future<void> _writeSnapshot(SenderService s) async {
+    final saved = await TransferReport(
       true,
       DateTime.now(),
       switch (s.phase) { SendPhase.done => 'done', SendPhase.cancelled => 'stopped', _ => 'interrupted' },
@@ -225,7 +231,11 @@ class _SendBodyState extends State<_SendBody> {
             SummaryRow(e.label, s.extraTally[e]!.added, s.extraTally[e]!.existing, s.extraTally[e]!.failed),
       ],
       lines: [
-        '${s.filesSent} files copied, ${s.filesAlready} already on the new phone, ${s.failedItems.length} failed.',
+        // Same words as the finished screen.
+        '${s.filesSent} files copied, ${s.filesAlready} were already there'
+            '${s.contactsTotal > 0 ? ', ${s.contactsAdded} contacts added' : ''}'
+            '${s.failedItems.isNotEmpty ? ', ${s.failedItems.length} failed' : ''}. '
+            'Every file was checksum-verified on the new phone.',
         if (s.clonedFiles > 0)
           '${s.clonedFiles} identical ${s.clonedFiles == 1 ? 'file' : 'files'} copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent).',
         if (s.resumedBytes > 0) '${formatBytes(s.resumedBytes)} continued instead of re-sent.',
@@ -233,7 +243,14 @@ class _SendBodyState extends State<_SendBody> {
       ],
       extras: {for (final e in s.selectedExtras) e.name: s.extraTally[e]!.toJson()},
       appVersion: kAppVersion,
-    ).save();
+    ).save(into: _snapshotPath);
+    _snapshotPath ??= saved?.path;
+  }
+
+  Future<void> _retryExtra(Extra e) async {
+    final s = _sender!;
+    await s.retryExtra(e);
+    if (!_busy) await _saveReport(s); // after the transfer: keep its snapshot in step
   }
 
   Future<void> _confirmStop() async {
@@ -473,7 +490,7 @@ class _SendBodyState extends State<_SendBody> {
           for (final e in Extra.values)
             if (s.selectedExtras.contains(e)) e
         ],
-        onRetry: s.canSendExtras ? s.retryExtra : null,
+        onRetry: s.canSendExtras ? _retryExtra : null,
         retryHint: 'Update the new phone to PhoneHop 5 or later, then start the transfer again.',
       ),
       filesBadge: failed,

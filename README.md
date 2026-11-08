@@ -4,14 +4,14 @@
 
 ### Move *everything* from your old Android phone to your new one — over Wi-Fi, fast, verified, without duplicates.
 
-[![Release](https://img.shields.io/badge/release-v5.7.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.7.0)
+[![Release](https://img.shields.io/badge/release-v5.8.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.8.0)
 [![Standard edition](https://img.shields.io/badge/standard%20permissions-v4.2.2-blue?style=for-the-badge)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
-[![Tests](https://img.shields.io/badge/tests-16%20passing-brightgreen?style=for-the-badge)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-17%20passing-brightgreen?style=for-the-badge)](#-testing)
 [![No cloud](https://img.shields.io/badge/cloud-none-lightgrey?style=for-the-badge)](#-privacy--safety)
 
-**[⬇️ Download the APK (v5.7.0)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.7.0)** ·
+**[⬇️ Download the APK (v5.8.0)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.8.0)** ·
 [Quick start](#-quick-start) ·
 [Features](#-features) ·
 [How it works](#-how-it-works) ·
@@ -21,7 +21,7 @@
 </div>
 
 > [!TIP]
-> **Latest release: PhoneHop 5.7.0** → [`apk/PhoneHop-v5.7.0.apk`](apk/PhoneHop-v5.7.0.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and every transfer leaves a **snapshot** of all three tabs that you keep, export and import. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. *PhoneHop was called **Phone Clone** up to 5.6.0; it updates in place.*
+> **Latest release: PhoneHop 5.8.0** → [`apk/PhoneHop-v5.8.0.apk`](apk/PhoneHop-v5.8.0.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and every transfer leaves a **snapshot** of all three tabs that you keep, export and import. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. *PhoneHop was called **Phone Clone** up to 5.6.0; it updates in place.*
 
 > [!WARNING]
 > **Some v5 Extras need restricted access.** Messages and call history use permissions that Google restricts, so **Play Protect may block the install from WhatsApp or a browser**. Install it over USB (`adb install`) or turn off Play Protect scanning while installing. Google Play allows them only after a manual review. See [Extras that need restricted access](#-v5-extras-that-need-restricted-access). Prefer standard permissions only? Use **[v4.2.2](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)** ([`apk/PhoneClone-v4.2.2.apk`](apk/PhoneClone-v4.2.2.apk)).
@@ -103,7 +103,13 @@ Every feature, screen by screen, with the version that added it. *These are the 
 
 ### 🗃️ Transfer snapshots *(home screen, kept forever)*
 
-| **Snapshot: Progress** · v5.6<br>outcome, totals, per-type table | **Snapshot: Files** · v5.6<br>same grouped view, Open & Show in Files app | **Snapshot: Extras** · v5.6 |
+The same screens as during the transfer, without the other phone. On the new phone, apps can still be installed from it.
+
+| **New phone, later: Progress** · v5.8<br>same finished screen, where it's saved | **New phone, later: Extras** · v5.8<br>install apps, switch SMS back, WhatsApp | |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/snap-new-01-progress.png" width="240" alt="Snapshot on the new phone: Progress"> | <img src="docs/screenshots/snap-new-02-extras.png" width="240" alt="Snapshot on the new phone: Extras"> | |
+
+| **Old phone, later: Progress** · v5.6 | **Snapshot: Files** · v5.6<br>same grouped view, Open & Show in Files app | **Snapshot: Extras** · v5.6 |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/home-02-snapshot-summary.png" width="240" alt="Snapshot summary"> | <img src="docs/screenshots/home-03-snapshot-files.png" width="240" alt="Snapshot files"> | <img src="docs/screenshots/home-04-snapshot-extras.png" width="240" alt="Snapshot extras"> |
 
@@ -209,7 +215,7 @@ Every file and where it stands: **on the new phone**, **pending**, **failed** or
 A card per extra with a plain status (*Copying… 320 of 840*, *Waiting · starts after all files are copied*), the same numbers on both phones, and **Try again** for anything skipped.
 
 ### 🗃️ Snapshots, kept forever *(v5.6)*
-Every transfer leaves a read-only **snapshot of all three tabs** in *Documents › PhoneHop › Snapshots*. It stays after the old phone is gone, even if the app is uninstalled. **Export** it with the share button, **import** it on another phone.
+Every transfer leaves a **snapshot of all three tabs**: the same Progress, Files and Extras screens you saw while the phones were connected. Apps can still be installed from it. It's saved in *Documents › PhoneHop › Snapshots*, and the full file path is shown on the snapshot. It stays after the old phone is gone, even if the app is uninstalled. **Export** it with the share button, **import** it on another phone. Transfers made before snapshots existed are **rebuilt from the new phone's records** of received files.
 
 </td>
 </tr>
@@ -390,7 +396,7 @@ v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), 
 - Folders Android doesn't let any app read (`Android/data`, `Android/obb`) are listed as **Restricted** instead of being silently skipped.
 - WhatsApp: its own **Transfer chats** is recommended.
 - Every file has **Open** and **Show in Files app** buttons.
-- **Transfer snapshots** on both phones: every transfer is kept as a read-only snapshot of its Progress, Files and Extras tabs in *Internal storage › Documents › PhoneHop › Snapshots*, so the record stays after the old phone is gone (even if the app is uninstalled). **Export** shares it (Drive, WhatsApp, email); **Import** opens one shared from the other phone.
+- **Transfer snapshots** on both phones: every transfer is kept as a snapshot of its Progress, Files and Extras tabs (the same screens, with apps still installable) in *Internal storage › Documents › PhoneHop › Snapshots*, so the record stays after the old phone is gone (even if the app is uninstalled). **Export** shares it (Drive, WhatsApp, email); **Import** opens one shared from the other phone.
 
 
 
@@ -732,7 +738,7 @@ The release APK is signed with the debug key, which is fine for sideloading. Set
 
 ```bash
 flutter test
-# 00:21 +16: All tests passed!
+# 00:22 +17: All tests passed!
 ```
 
 ---
@@ -778,7 +784,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| [**v5.7.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.7.0) · *latest release* | PhoneHop | Renamed from *Phone Clone* to **PhoneHop** (Huawei already has an app called Phone Clone); README with every v5 feature and 21 screenshots | **~20 min** |
+| [**v5.8.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.8.0) · *latest release* | Replica | Snapshots show the **same screens as the transfer** (finished screen, apps to install, SMS switch-back, WhatsApp) and the full file path; older transfers **rebuilt from the new phone's records** | **~35 min** |
+| v5.7.0 | PhoneHop | Renamed from *Phone Clone* to **PhoneHop** (Huawei already has an app called Phone Clone); README with every v5 feature and 21 screenshots | **~20 min** |
 | v5.6.0 | Snapshots | Every transfer kept as a read-only **snapshot** of Progress, Files and Extras in *Documents › PhoneHop › Snapshots*; export & import; *Show in Files app* opens the exact folder | **~45 min** |
 | v5.5.1 | Polish | Files copied before a pause no longer counted as "already there"; tidier labels; README screenshots | **~40 min** |
 | v5.5.0 | Actions | Every file has **Open** and **Show in Files app** buttons; status badge on the thumbnail | **~15 min** |

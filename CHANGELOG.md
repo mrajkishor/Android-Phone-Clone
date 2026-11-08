@@ -3,10 +3,11 @@
 All notable changes to **PhoneHop** (formerly *Phone Clone*, and before that *Phone Transfer*) are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-> **Latest release: 5.7.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
+> **Latest release: 5.8.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.8.0](#580--2026-11-09) | Snapshots are a replica of the transfer screens; older transfers rebuilt from records | 5 | ✅ | ~35 min |
 | [5.7.0](#570--2026-11-09) | Renamed **PhoneHop** | 5 | ✅ | ~20 min |
 | [5.6.0](#560--2026-11-09) | Transfer snapshots: all 3 tabs kept forever, export & import; Show in Files app fixed | 5 | ✅ | ~45 min |
 | [5.5.1](#551--2026-11-09) | Counts after a pause; tidier labels; README screenshots | 5 | ✅ | ~40 min |
@@ -26,7 +27,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [5.7.0] — 2026-11-09 *(latest release)*
+## [5.8.0] — 2026-11-09 *(latest release)*
+
+### Changed
+- **A snapshot now shows the same screens as the transfer**, without the other phone:
+  - **Progress** is the finished screen itself: Hurray or the outcome, the same words, the per-type table (files, contacts and every extra), the albums tip, failed files.
+  - **Extras** has the same cards, plus everything below them: **the old phone's apps with Install / Install all** (they install from the copied APKs), **Switch back** if PhoneHop is still the SMS app, and the WhatsApp card.
+  - It isn't frozen: it follows what happens afterwards on that phone. Installing an app from it, or a *Try again* after the transfer, updates the same snapshot.
+- **Where it's saved** is written on the snapshot as the full file path, with **Export** and **Show in Files app** buttons.
+
+### Fixed
+- **The new phone's snapshot could show an empty Extras tab and a bare Progress tab.** Transfers made with 5.3–5.5 only kept the file list. The new phone now rebuilds a snapshot from **its own record of received files** (the index it uses to skip duplicates): every file, the per-type table and the apps to install. Counts for contacts, messages and other extras weren't recorded by those versions, and the snapshot says so.
+- Two saves at the same moment could make a second copy of a snapshot. Saves now happen one at a time, and every file is written whole before it appears.
+- 1 new test (rebuild from records), and the extras test now installs an app from the snapshot (**17 tests**).
+
+## [5.7.0] — 2026-11-09
 
 ### Changed
 - **Renamed to PhoneHop.** Huawei already has a well-known app called *Phone Clone*. The new name is used in the launcher, title, notifications, popups, Play listing, feature graphic and privacy policy. The package (`com.mrajkishor.phoneclone`) is unchanged, so it **updates in place** and keeps its data.

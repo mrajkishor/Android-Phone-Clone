@@ -37,6 +37,22 @@ class ReceivedApp {
   ReceivedApp(this.package, this.label, this.versionName, this.versionCode, this.fromPlay, this.paths);
 }
 
+/// Installs one app from its copied APK files (Android asks the user to confirm).
+/// Used during a transfer and from a snapshot later on.
+Future<void> installReceivedApp(ReceivedApp a, void Function() changed) async {
+  if (!await NativeExtras.canInstallApps()) {
+    await NativeExtras.openInstallPermission();
+    return;
+  }
+  a.state = 'installing';
+  changed();
+  final (ok, msg) = await NativeExtras.installApks(a.paths);
+  a
+    ..state = ok ? 'installed' : 'failed'
+    ..message = msg;
+  changed();
+}
+
 /// One file of this session, for the Files tab.
 class SessionFile {
   final String rel;
@@ -684,6 +700,7 @@ class ReceiverService extends ChangeNotifier {
       t.saved = t.already = t.failed = 0;
     }
     sessionFiles.clear();
+    _snapshotPath = null;
     for (final e in Extra.values) {
       extraTally[e] = ExtraTally();
     }
@@ -987,8 +1004,19 @@ class ReceiverService extends ChangeNotifier {
 
   /// A read-only snapshot of this transfer (Progress, Files and Extras), kept forever
   /// in Documents/PhoneHop/Snapshots.
-  Future<void> _saveReport(String outcome) async {
-    await TransferReport(
+  /// This transfer's snapshot file, kept up to date (e.g. when an extra finishes after
+  /// the files, or an app is installed).
+  String? _snapshotPath;
+  String _snapshotOutcome = 'done';
+
+  Future<void> _saving = Future.value();
+
+  /// Saves one at a time, so the second save updates the file the first one created.
+  Future<void> _saveReport(String outcome) => _saving = _saving.then((_) => _writeSnapshot(outcome));
+
+  Future<void> _writeSnapshot(String outcome) async {
+    _snapshotOutcome = outcome;
+    final saved = await TransferReport(
       false,
       DateTime.now(),
       outcome,
@@ -1007,7 +1035,11 @@ class ReceiverService extends ChangeNotifier {
             SummaryRow(e.label, extraTally[e]!.added, extraTally[e]!.existing, extraTally[e]!.failed),
       ],
       lines: [
-        '$savedTotal files copied, $alreadyTotal already here, ${finalFailures.length} failed.',
+        // Same words as the finished screen.
+        '$savedTotal files copied, $alreadyTotal were already here'
+            '${contactsAdded > 0 ? ', $contactsAdded contacts added' : ''}'
+            '${finalFailures.isNotEmpty ? ', ${finalFailures.length} failed' : ''}. '
+            'Every file is in the same folder it had on the old phone, with its original date.',
         if (clonedFiles > 0)
           '$clonedFiles identical ${clonedFiles == 1 ? 'file' : 'files'} copied here instead of sent (${formatBytes(clonedBytes)} saved).',
         if (whatsappBackup) 'A WhatsApp backup was copied: WhatsApp offers to restore it during setup.',
@@ -1016,9 +1048,19 @@ class ReceiverService extends ChangeNotifier {
         for (final e in Extra.values)
           if (extraTally[e]!.state != 'pending') e.name: extraTally[e]!.toJson(),
       },
-      apps: [for (final a in apps) SnapshotApp(a.label, a.package, a.state, a.versionName)],
+      apps: [
+        for (final a in apps)
+          SnapshotApp(a.label, a.package, a.state, a.versionName,
+              versionCode: a.versionCode, fromPlay: a.fromPlay, paths: a.paths),
+      ],
       appVersion: kAppVersion,
-    ).save();
+    ).save(into: _snapshotPath);
+    _snapshotPath ??= saved?.path;
+  }
+
+  /// After the transfer, keep its snapshot in step with what the screen shows.
+  Future<void> _refreshSnapshot() async {
+    if (phase == ReceivePhase.done && _snapshotPath != null) await _saveReport(_snapshotOutcome);
   }
 
   void _noteFile(String rel, String path, int size, String status, Category category) {
@@ -1079,6 +1121,7 @@ class ReceiverService extends ChangeNotifier {
     }
     if (pendingPrompt == e) pendingPrompt = null;
     _tick(force: true);
+    _refreshSnapshot(); // e.g. "Try again" after the transfer had ended
   }
 
   /// Extras the user wants to try again from this phone; the old phone picks them up
@@ -1202,17 +1245,8 @@ class ReceiverService extends ChangeNotifier {
 
   /// Installs one received app (Android asks the user to confirm).
   Future<void> installApp(ReceivedApp a) async {
-    if (!await NativeExtras.canInstallApps()) {
-      await NativeExtras.openInstallPermission();
-      return;
-    }
-    a.state = 'installing';
-    _tick(force: true);
-    final (ok, msg) = await NativeExtras.installApks(a.paths);
-    a
-      ..state = ok ? 'installed' : 'failed'
-      ..message = msg;
-    _tick(force: true);
+    await installReceivedApp(a, () => _tick(force: true));
+    await _refreshSnapshot();
   }
 
   Future<Map<String, dynamic>> _receiveWallpaper(HttpRequest req) async {

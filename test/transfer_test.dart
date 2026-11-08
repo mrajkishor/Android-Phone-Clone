@@ -546,6 +546,8 @@ void main() {
             return true;
           }(),
         'installedVersion' => -1,
+        'canInstallApps' => true,
+        'installApks' => {'ok': true},
         _ => null,
       };
     };
@@ -623,6 +625,12 @@ void main() {
     expect(report.rows.map((x) => x.label), contains('Call history'));
     expect(report.extras[Extra.calls.name]!['added'], 2);
     expect(report.apps.single.package, 'com.example.x');
+    expect(report.apps.single.paths.single, endsWith('PhoneClone/Apps/com.example.x/setup.apk'));
+    // Installing an app later updates the same snapshot (it isn't frozen).
+    await r.installApp(r.apps.single);
+    final updated = (await TransferReport.load())!;
+    expect(updated.path, report.path);
+    expect(updated.apps.single.state, 'installed');
     // Export / import: the same snapshot imported again is kept once; other files are refused.
     final bytes = File(report.path!).readAsBytesSync();
     final again = await TransferReport.import(bytes);
@@ -762,5 +770,26 @@ void main() {
     await tester.tap(find.byTooltip('Open this folder in the Files app').first);
     await tester.pump();
     expect(calls.last, 'openFilesApp Documents');
+  });
+
+  test('transfers made before snapshots: rebuilt from the new phone\'s records, with the apps to install', () async {
+    final r = await startReceiver();
+    final (s, plan) = await prepareSender(r);
+    await s.run(plan);
+    s.dispose();
+    await r.stop();
+    // As if the transfer had been made by an older version: no snapshots, only the records.
+    currentRoot = newRoot.path;
+    final snaps = Directory(p.join(newRoot.path, 'Documents/PhoneHop'));
+    if (snaps.existsSync()) snaps.deleteSync(recursive: true);
+    final all = await TransferReport.all();
+    final rebuilt = all.singleWhere((x) => x.source == 'records');
+    expect(rebuilt.sent, isFalse);
+    expect(rebuilt.files.map((f) => f.rel).toSet(), {for (final f in plan.files) f.rel});
+    expect(rebuilt.path, contains('Documents/PhoneHop/Snapshots/'), reason: 'kept, so it can be exported');
+    expect(rebuilt.table.firstWhere((x) => x.label == Category.photos.label).copied, 1);
+    expect(rebuilt.installableApps, isEmpty, reason: 'no app installers in this transfer');
+    // Not rebuilt twice.
+    expect((await TransferReport.all()).where((x) => x.source == 'records'), hasLength(1));
   });
 }

@@ -233,6 +233,7 @@ void main() {
     Widget app(Widget home) => RepaintBoundary(
           key: const Key('shot'),
           child: MaterialApp(
+            key: UniqueKey(), // a fresh navigator for every screen
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
               colorSchemeSeed: const Color(0xFF1B6EF3),
@@ -289,6 +290,18 @@ void main() {
     // Leave the screen (the service stops and keeps the report).
     await tester.pumpWidget(app(const SizedBox()));
     await wait(500);
+
+    // The new phone later, without the old phone: its snapshot shows the same tabs.
+    await tester.pumpWidget(app(const HomeScreen()));
+    await until(() => find.textContaining('Last transfer · received').evaluate().isNotEmpty);
+    await tapText('Last transfer · received');
+    await until(() => find.byTooltip('Export (share)').evaluate().isNotEmpty);
+    await shot('snap-new-01-progress');
+    await tapText('Extras');
+    await tester.drag(find.byType(ListView).last, const Offset(0, -700));
+    await shot('snap-new-02-extras');
+    await tester.pumpWidget(app(const SizedBox()));
+    await wait(300);
 
     // ================= 2. Old phone (sending), new phone runs headless =================
     newRoot = Directory(p.join(tmp.path, 'new2'))..createSync();

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../transfer/extras.dart';
 import 'file_visuals.dart';
 import '../transfer/native.dart';
+import '../transfer/receiver.dart' show ReceivedApp;
 import '../transfer/protocol.dart';
 
 /// Progress / Files / Extras, on both phones.
@@ -519,6 +520,9 @@ class ExtrasStatusList extends StatelessWidget {
   /// Shown instead of the button when [onRetry] is null but trying again is possible elsewhere.
   final String? retryHint;
 
+  /// Shown when there are no extras.
+  final String? emptyText;
+
   const ExtrasStatusList({
     super.key,
     required this.tally,
@@ -527,6 +531,7 @@ class ExtrasStatusList extends StatelessWidget {
     this.newPhone = false,
     this.onRetry,
     this.retryHint,
+    this.emptyText,
   });
 
   static IconData iconOf(Extra e) => switch (e) {
@@ -546,10 +551,11 @@ class ExtrasStatusList extends StatelessWidget {
     final items = shown.toList();
     return ListView(padding: const EdgeInsets.only(bottom: 16), children: [
       if (items.isEmpty)
-        const Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('Nothing extra in this transfer. Messages, call history, calendar, apps, wallpaper and '
-              'ringtones can be chosen on the old phone before starting.'),
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(emptyText ??
+              'Nothing extra in this transfer. Messages, call history, calendar, apps, wallpaper and '
+                  'ringtones can be chosen on the old phone before starting.'),
         ),
       for (final e in items) _card(context, e, tally[e]!),
       ...footer,
@@ -677,6 +683,88 @@ class RestrictedChip extends StatelessWidget {
           Text(extra.isRestricted ? 'Restricted' : 'Sensitive', style: TextStyle(fontSize: 11, color: color)),
         ]),
       ),
+    );
+  }
+}
+
+/// WhatsApp chats: the built-in "Transfer chats" (recommended), or the local backup.
+class WhatsAppCard extends StatelessWidget {
+  final bool backupCopied;
+  const WhatsAppCard({super.key, required this.backupCopied});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.chat),
+          title: const Text('WhatsApp chats'),
+          subtitle: Text('Recommended: WhatsApp’s own Transfer chats. Install WhatsApp here, verify your number and '
+              'choose “Transfer from old phone”; on the old phone open WhatsApp → Settings → Chats → '
+              'Transfer chats and scan the code. Same Wi-Fi, Location on, no Google Drive needed.\n\n'
+              '${backupCopied ? 'A local WhatsApp backup was also copied: if WhatsApp offers it during setup, tap Restore. '
+                  'Check its date: an older Google Drive backup may be offered first.' : 'Or: make a local backup on the old phone '
+                  '(Chats → Chat backup → Back up) before the transfer, and restore it here during setup.'}'),
+          isThreeLine: true,
+        ),
+      );
+}
+
+/// The old phone's apps, ready to install on this phone (during a transfer and from a snapshot).
+class AppsInstallCard extends StatelessWidget {
+  final List<ReceivedApp> apps;
+  final Future<void> Function(ReceivedApp app) onInstall;
+  const AppsInstallCard({super.key, required this.apps, required this.onInstall});
+
+  @override
+  Widget build(BuildContext context) {
+    final todo = apps.where((a) => a.state == 'ready' || a.state == 'failed').toList();
+    return Card(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ListTile(
+          leading: const Icon(Icons.apps),
+          title: Text(todo.isEmpty
+              ? '${apps.length} ${apps.length == 1 ? 'app' : 'apps'} from the old phone, all installed'
+              : '${apps.length} ${apps.length == 1 ? 'app' : 'apps'} from the old phone · ${todo.length} to install'),
+          subtitle: const Text('Android asks you to confirm each one. App data and logins are not included; '
+              'apps from the Play Store keep updating from there.'),
+          isThreeLine: true,
+        ),
+        if (todo.length > 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: FilledButton.icon(
+              onPressed: () async {
+                for (final a in todo) {
+                  await onInstall(a);
+                }
+              },
+              icon: const Icon(Icons.download_for_offline),
+              label: Text('Install all ${todo.length}'),
+            ),
+          ),
+        for (final a in apps)
+          ListTile(
+            dense: true,
+            title: Text(a.label),
+            subtitle: Text([
+              if (a.versionName != null) 'v${a.versionName}',
+              if (a.fromPlay) 'from Play Store',
+              if (a.message != null && a.state == 'failed') a.message!,
+            ].join(' • ')),
+            trailing: switch (a.state) {
+              'installed' => const Icon(Icons.check_circle, color: Colors.green),
+              'installing' => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              _ => Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (a.fromPlay)
+                    IconButton(
+                      tooltip: 'Open in Play Store',
+                      icon: const Icon(Icons.shop),
+                      onPressed: () => NativeExtras.openPlayStore(a.package),
+                    ),
+                  TextButton(onPressed: () => onInstall(a), child: Text(a.state == 'failed' ? 'Retry' : 'Install')),
+                ]),
+            },
+          ),
+      ]),
     );
   }
 }
