@@ -676,4 +676,37 @@ void main() {
     final v = RegExp(r'^version: ([^+\s]+)', multiLine: true).firstMatch(pubspec)!.group(1);
     expect(kAppVersion, v);
   });
+
+  testWidgets('Files tab: tap a file to open it in the phone\'s own app; folders open in the Files app', (tester) async {
+    final calls = <String>[];
+    extraNative = (call) async {
+      calls.add('${call.method} ${(call.arguments as Map).values.first}');
+      return call.method == 'openFile' ? 'ok' : true;
+    };
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    const rows = [
+      FileRow('Documents/x.pdf', 10, 'sent', category: Category.documents, path: '/storage/emulated/0/Documents/x.pdf'),
+      FileRow('Download/y.zip', 10, 'waiting', category: Category.archives),
+    ];
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: FileCompareList(rows: rows))));
+    await tester.tap(find.text('Documents'));
+    await tester.pump();
+    await tester.tap(find.text('x.pdf'));
+    await tester.pump();
+    expect(calls, ['openFile /storage/emulated/0/Documents/x.pdf']);
+
+    await tester.tap(find.text('Archives'));
+    await tester.pump();
+    await tester.tap(find.text('y.zip'));
+    await tester.pump();
+    expect(find.text('This file isn’t on this phone yet.'), findsOneWidget);
+
+    await tester.tap(find.text('Folder'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Open this folder in the Files app').first);
+    await tester.pump();
+    expect(calls.last, 'openFilesApp Documents');
+  });
 }

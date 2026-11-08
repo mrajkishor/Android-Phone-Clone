@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.4.0](#540--2026-11-09) | Preview: tap a file to open it; open folders in the Files app | 5 | ✅ | ~15 min |
 | [5.3.0](#530--2026-11-09) | Preview: "Last transfer" on the home screen; new phone lists files already there; correct version in the app | 5 | ✅ | ~25 min |
 | [5.2.0](#520--2026-11-08) | Thumbnails and app names in Files; Extras that agree on both phones, with Try again | 5 | ✅ | ~30 min |
 | [5.1.0](#510--2026-11-08) | Never re-sends what's already there; grouped Files tab; restricted items marked | 5 | ✅ | ~25 min |
@@ -19,6 +20,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 > v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [5.4.0] — 2026-11-09 *(preview, restricted access)*
+
+### Added
+- **Tap a file to open it** in the phone's own app (Gallery, PDF viewer, video player…), wherever the Files view appears: during a transfer and in *Last transfer*. Android asks which app if there's more than one.
+- **Open in the Files app**: a folder icon next to the search box opens the phone's Files app. In *Folder* view, each folder has its own icon that opens the Files app at that folder, where the phone supports it.
+- Clear messages instead of silence: *"This file isn't on this phone yet"*, *"No app on this phone can open this type of file"*, and the reason for restricted items. App installers point to the Extras tab.
+- 1 new test (**16 tests**).
 
 ## [5.3.0] — 2026-11-09 *(preview, restricted access)*
 

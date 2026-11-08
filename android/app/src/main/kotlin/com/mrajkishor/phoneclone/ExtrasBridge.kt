@@ -140,6 +140,10 @@ class ExtrasBridge(private val ctx: Context) {
                 setRingtone(call.argument<String>("type")!!, call.argument<String>("path"), call.argument<String>("title"))
             }
 
+            // ---------------- open in the phone's own apps ----------------
+            "openFile" -> result.success(openFile(call.argument<String>("path")!!))
+            "openFilesApp" -> result.success(openFilesApp(call.argument<String>("folder")))
+
             // ---------------- thumbnails for the Files tab ----------------
             "apkMeta" -> bg(result) { apkMeta(call.argument<String>("path")!!) }
             "appIcon" -> bg(result) { appIcon(call.argument<String>("package")!!) }
@@ -638,6 +642,46 @@ class ExtrasBridge(private val ctx: Context) {
         d.setBounds(0, 0, bmp.width, bmp.height)
         d.draw(Canvas(bmp))
         return ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+    }
+
+    // ======================= open files =======================
+
+    private fun startOrFalse(intent: Intent): Boolean = try {
+        val a = activity()
+        if (a != null) a.startActivity(intent) else ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (_: Exception) { false }
+
+    /** Opens a file in whatever app the user has for it. Returns "ok", "noApp" or "notHere". */
+    private fun openFile(path: String): String {
+        val f = File(path)
+        if (!f.isFile) return "notHere"
+        val uri = try {
+            androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", f)
+        } catch (_: Exception) { return "notHere" } // e.g. an installed app's own APK
+        val ext = f.extension.lowercase()
+        val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
+        val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        return if (startOrFalse(Intent.createChooser(view, null).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))) "ok" else "noApp"
+    }
+
+    /** Opens the phone's Files app, at [folder] (relative to internal storage) where the phone supports it. */
+    private fun openFilesApp(folder: String?): Boolean {
+        val authority = "com.android.externalstorage.documents"
+        if (folder != null && Build.VERSION.SDK_INT >= 26) {
+            val doc = android.provider.DocumentsContract.buildDocumentUri(authority, "primary:$folder")
+            val atFolder = Intent(Intent.ACTION_VIEW).setDataAndType(doc, "vnd.android.document/directory")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (startOrFalse(atFolder)) return true
+        }
+        val root = android.provider.DocumentsContract.buildRootUri(authority, "primary")
+        if (startOrFalse(Intent(Intent.ACTION_VIEW).setDataAndType(root, "vnd.android.document/root"))) return true
+        for (pkg in listOf("com.google.android.apps.nbu.files", "com.google.android.documentsui", "com.android.documentsui",
+                "com.sec.android.app.myfiles", "com.motorola.filemanager")) {
+            val launch = ctx.packageManager.getLaunchIntentForPackage(pkg) ?: continue
+            if (startOrFalse(launch)) return true
+        }
+        return startOrFalse(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
     }
 
     // ======================= thumbnails =======================

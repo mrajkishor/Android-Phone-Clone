@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../transfer/extras.dart';
 import 'file_visuals.dart';
+import '../transfer/native.dart';
 import '../transfer/protocol.dart';
 
 /// Progress / Files / Extras, on both phones.
@@ -303,14 +304,29 @@ class _FileCompareListState extends State<FileCompareList> {
         ]),
       ),
       const SizedBox(height: 6),
-      TextField(
-        decoration: const InputDecoration(
-          isDense: true,
-          prefixIcon: Icon(Icons.search),
-          hintText: 'Search by name or folder',
-          border: OutlineInputBorder(),
+      Row(children: [
+        Expanded(
+          child: TextField(
+            decoration: const InputDecoration(
+              isDense: true,
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Search by name or folder',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
         ),
-        onChanged: (v) => setState(() => _query = v),
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: 'Open the Files app',
+          icon: const Icon(Icons.folder_open_outlined),
+          onPressed: () => _openFolder(context, null),
+        ),
+      ]),
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text('Tap a file to open it.',
+            style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ),
       const SizedBox(height: 6),
       Expanded(
@@ -362,10 +378,57 @@ class _FileCompareListState extends State<FileCompareList> {
               ),
             ]),
           ),
+          if (_groupBy == _GroupBy.folder && _realFolder(g.key))
+            IconButton(
+              tooltip: 'Open this folder in the Files app',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.folder_open_outlined, size: 20),
+              onPressed: () => _openFolder(context, g.key),
+            ),
           Icon(open ? Icons.expand_less : Icons.expand_more),
         ]),
       ),
     );
+  }
+
+  static bool _realFolder(String key) => key != 'apps' && key != 'Main folder' && !key.startsWith('Android/data');
+
+  void _say(BuildContext context, String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating));
+  }
+
+  Future<void> _openFolder(BuildContext context, String? folder) async {
+    var ok = false;
+    try {
+      ok = await NativeExtras.openFilesApp(folder);
+    } catch (_) {}
+    if (!ok && context.mounted) _say(context, 'Couldn’t open the Files app on this phone.');
+  }
+
+  /// Opens the file in the phone's own app for it (Gallery, PDF viewer, player…).
+  Future<void> _openFile(BuildContext context, FileRow r) async {
+    if (r.status == 'restricted') {
+      _say(context, r.error ?? 'Android doesn’t let apps open this.');
+      return;
+    }
+    final path = r.path;
+    if (path == null) {
+      _say(context, r.status == 'failed' ? 'This file didn’t reach this phone.' : 'This file isn’t on this phone yet.');
+      return;
+    }
+    if (r.rel.startsWith('PhoneClone/Apps/')) {
+      _say(context, 'Apps are installed from the Extras tab on the new phone.');
+      return;
+    }
+    var result = 'noApp';
+    try {
+      result = await NativeExtras.openFile(path);
+    } catch (_) {}
+    if (!context.mounted) return;
+    if (result == 'noApp') _say(context, 'No app on this phone can open this type of file.');
+    if (result == 'notHere') _say(context, 'This file isn’t on this phone any more.');
   }
 
   Widget _row(FileRow r) {
@@ -388,6 +451,7 @@ class _FileCompareListState extends State<FileCompareList> {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: Tooltip(message: label, child: Icon(icon, color: color, size: 20)),
+      onTap: () => _openFile(context, r),
     );
   }
 }

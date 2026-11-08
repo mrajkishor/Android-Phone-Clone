@@ -113,6 +113,15 @@ class NativeExtras {
     return (r['ok'] == true, r['message'] as String?);
   }
 
+  // ---- open in the phone's own apps ----
+  /// "ok", "noApp" (nothing installed can open it) or "notHere" (not a file on this phone).
+  static Future<String> openFile(String path) async =>
+      await _c.invokeMethod<String>('openFile', {'path': path}) ?? 'noApp';
+
+  /// Opens the phone's Files app, at [folder] (e.g. "DCIM/Camera") where the phone allows it.
+  static Future<bool> openFilesApp([String? folder]) async =>
+      await _c.invokeMethod<bool>('openFilesApp', {'folder': folder}) ?? false;
+
   // ---- thumbnails (both phones) ----
   /// {package, label, versionName, icon (PNG)} from an APK file, or null for a split part.
   static Future<Map<String, dynamic>?> apkMeta(String path) async {
