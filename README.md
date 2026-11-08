@@ -588,15 +588,14 @@ That's roughly **250× faster**, or, put another way, Claude finished three vers
 ### 📊 Where those 10 weeks would *really* have gone
 
 ```mermaid
-pie showData
-    title Where 384 hours of traditional dev time goes
+pie title Where 384 hours of traditional dev time goes
     "Actually writing code" : 96
-    "Fighting Gradle & Android SDK versions" : 72
+    "Fighting Gradle and Android SDK versions" : 72
     "Meetings that could have been an email" : 58
     "Searching Stack Overflow" : 50
     "Waiting for builds" : 40
-    "Chai & samosa breaks" : 38
-    "Asking 'works on my phone?'" : 30
+    "Chai and samosa breaks" : 38
+    "Asking - works on my phone" : 30
 ```
 
 ### 🏆 Fun facts from this build
