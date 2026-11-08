@@ -424,4 +424,46 @@ void main() {
     s2.dispose();
     await r.stop();
   });
+
+  test('two senders at once: the second is turned away, progress never jumps around', () async {
+    final before = snapshot(oldRoot);
+    final r = await startReceiver();
+    final (s1, plan) = await prepareSender(r);
+    final seen = <int>[];
+    var firstRunning = true;
+    r.addListener(() {
+      final b = r.sender['bytesDone'];
+      if (firstRunning && b is int) seen.add(b);
+    });
+    // Slow the first transfer down a little so the second one arrives while it runs.
+    s1.debugOnChunk = (sender, f, bytes) {};
+    ReceiverService.debugBeforeReceive = (name) => Future.delayed(const Duration(milliseconds: 150));
+    final first = s1.run(plan).whenComplete(() => firstRunning = false);
+    while (r.phase != ReceivePhase.receiving) {
+      await Future.delayed(const Duration(milliseconds: 20));
+    }
+    // e.g. the older app, or an earlier transfer still running in the background
+    final s2 = SenderService(PairingInfo(host: '127.0.0.1', port: r.pairing!.port, code: r.pairing!.code))
+      ..debugActAsOtherApp = true;
+    await s2.ping();
+    await s2.run(plan);
+    expect(r.refusedRequests, greaterThan(0), reason: 'the second sender was turned away while the first ran');
+    if (s2.phase == SendPhase.error) {
+      expect(s2.fatalError, contains('Another transfer is already sending'));
+    } else {
+      // It waited until the first finished, then found everything already there.
+      expect(s2.phase, SendPhase.done);
+      expect(s2.filesSent, 0);
+    }
+
+    await first;
+    expect(s1.phase, SendPhase.done, reason: 'the first transfer is not disturbed');
+    expect(snapshot(newRoot), expectedCopy(before));
+    for (var i = 1; i < seen.length; i++) {
+      expect(seen[i], greaterThanOrEqualTo(seen[i - 1]), reason: 'progress on the new phone never goes backwards');
+    }
+    s1.dispose();
+    s2.dispose();
+    await r.stop();
+  });
 }

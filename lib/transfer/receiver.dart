@@ -155,6 +155,16 @@ class ReceiverService extends ChangeNotifier {
   /// (e.g. the hotspot was restarted): the old phone must scan the new QR code.
   bool addressChanged = false;
   DateTime _lastSenderContact = DateTime.now();
+
+  /// The one transfer this phone is receiving right now (from its /hello).
+  /// Requests from any other transfer are refused while this one is alive,
+  /// so two senders can never mix (e.g. an older app still running in the background).
+  String? _activeTransfer;
+  int _lastHeartbeatSeq = -1;
+  int _maxBytesDone = 0;
+
+  /// Another sender tried to join while a transfer was running, and was refused.
+  int refusedRequests = 0;
   bool _wasLost = false;
   Timer? _addressTimer;
   ReceivePhase phase = ReceivePhase.starting;
@@ -404,8 +414,29 @@ class ReceiverService extends ChangeNotifier {
       await res.close();
       return;
     }
-    _lastSenderContact = DateTime.now();
-    if (req.uri.path == '/hello') addressChanged = false; // the old phone has the current address
+    // One transfer at a time. Read-only requests (/ping, /check) are always fine.
+    final transfer = req.headers.value('x-transfer') ?? '';
+    final path = req.uri.path;
+    final readOnly = path == '/ping' || path == '/check';
+    final someoneElse = _activeTransfer != null && transfer != _activeTransfer;
+    final activeAlive = phase == ReceivePhase.receiving && !senderLost;
+    if (!readOnly && someoneElse && (path != '/hello' || activeAlive)) {
+      // An older transfer that was replaced, or a second sender while one is running.
+      refusedRequests++;
+      await req.drain<void>();
+      res.statusCode = 423; // Locked
+      res.write('another transfer is already sending to this phone');
+      await res.close();
+      _tick(force: true);
+      return;
+    }
+    if (!readOnly) _lastSenderContact = DateTime.now();
+    if (path == '/hello') {
+      addressChanged = false; // the old phone has the current address
+      _activeTransfer = transfer;
+      _lastHeartbeatSeq = -1;
+      _maxBytesDone = 0;
+    }
     final v4 = debugProtocolVersion >= 4;
     try {
       Object? reply;
@@ -430,7 +461,16 @@ class ReceiverService extends ChangeNotifier {
           phase = ReceivePhase.receiving;
           reply = {'ok': true};
         case '/state':
-          sender = (await _json(req) as Map).cast<String, dynamic>();
+          final hb = (await _json(req) as Map).cast<String, dynamic>();
+          final seq = hb['seq'] as int? ?? _lastHeartbeatSeq + 1;
+          if (seq > _lastHeartbeatSeq) {
+            // Ignore late, out-of-order heartbeats; progress never goes backwards.
+            _lastHeartbeatSeq = seq;
+            final b = hb['bytesDone'] as int? ?? 0;
+            if (b > _maxBytesDone) _maxBytesDone = b;
+            hb['bytesDone'] = _maxBytesDone;
+            sender = hb;
+          }
           reply = {'ok': true};
         case '/contacts':
           reply = await _importContacts((await _json(req) as List).cast<Map>());
@@ -472,6 +512,7 @@ class ReceiverService extends ChangeNotifier {
             } catch (_) {}
           }
           phase = ReceivePhase.done;
+          _activeTransfer = null; // the next transfer may start
           inFlight.clear();
           _updateNotification();
           await Native.keepScreenOn(false);

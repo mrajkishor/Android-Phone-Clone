@@ -85,6 +85,9 @@ class _Rejected implements Exception {
 }
 
 /// A problem with this particular file. It goes to the retry queue.
+/// The new phone is busy with another transfer (HTTP 423).
+class _Busy implements Exception {}
+
 class _FileFailure implements Exception {
   final String message;
   _FileFailure(this.message);
@@ -198,7 +201,27 @@ class SenderService extends ChangeNotifier {
     statusLine = 'Skipping the identical-file check…';
     _tick(force: true);
   }
-  int get bytesDone => min(totalBytes, _completedBytes + lanes.values.fold<int>(0, (s, l) => s + l.bytes));
+  /// Never goes backwards within a transfer, even when a file in flight is retried.
+  int get bytesDone {
+    final now = min(totalBytes, _completedBytes + lanes.values.fold<int>(0, (s, l) => s + l.bytes));
+    if (now > _maxBytesShown) _maxBytesShown = now;
+    return _maxBytesShown;
+  }
+
+  int _maxBytesShown = 0;
+
+  /// Identifies this run of the transfer to the new phone (sent on every request).
+  String _transfer = '';
+  int _heartbeatSeq = 0;
+
+  /// Only one transfer per phone: starting a new one stops any earlier one
+  /// still running in the background.
+  static SenderService? _runningInstance;
+
+  /// Test hook: behave like a transfer from another app or phone (don't stop
+  /// other transfers in this process).
+  @visibleForTesting
+  bool debugActAsOtherApp = false;
 
   /// What each lane is sending right now.
   final Map<int, LaneView> lanes = {};
@@ -360,6 +383,7 @@ class SenderService extends ChangeNotifier {
     }
     final req = await _client.getUrl(pairing.uri('/ping'));
     req.headers.set('x-code', pairing.code);
+    req.headers.set('x-transfer', _transfer);
     final res = await req.close().timeout(const Duration(seconds: 8));
     final body = await utf8.decodeStream(res);
     if (res.statusCode == HttpStatus.forbidden) throw 'Wrong pairing code.';
@@ -407,6 +431,7 @@ class SenderService extends ChangeNotifier {
     Future<dynamic> go() async {
       final req = await _client.openUrl(method, pairing.uri(path, query));
       req.headers.set('x-code', pairing.code);
+    req.headers.set('x-transfer', _transfer);
       if (body != null) {
         final bytes = utf8.encode(jsonEncode(body));
         req.headers.contentType = ContentType.json;
@@ -418,6 +443,7 @@ class SenderService extends ChangeNotifier {
       if (res.statusCode == 409) throw _FileFailure('Checksum mismatch: the file arrived damaged');
       if (res.statusCode == 410) throw _FileFailure('The new phone lost the partly received file');
       if (res.statusCode == 404) return null;
+      if (res.statusCode == 423) throw _Busy();
       if (res.statusCode != 200) throw _Rejected(text);
       return text.isEmpty ? null : jsonDecode(text);
     }
@@ -433,6 +459,8 @@ class SenderService extends ChangeNotifier {
       } on _Rejected {
         rethrow;
       } on _FileFailure {
+        rethrow;
+      } on _Busy {
         rethrow;
       } catch (_) {
         if (_cancel) throw _CancelSignal();
@@ -480,6 +508,7 @@ class SenderService extends ChangeNotifier {
     final flight = _Inflight(req);
     _inflight[lane] = flight;
     req.headers.set('x-code', pairing.code);
+    req.headers.set('x-transfer', _transfer);
     req.headers.contentType = ContentType.binary;
     req.contentLength = f.size - offset;
     // Pause or Stop pressed while we were getting ready.
@@ -497,6 +526,7 @@ class SenderService extends ChangeNotifier {
       }));
       final res = await req.close();
       final text = await utf8.decodeStream(res);
+      if (res.statusCode == 423) throw _Busy();
       if (res.statusCode != 200) throw _Rejected(text);
       final received = (jsonDecode(text) as Map)['received'] as int;
       if (received != f.size) throw _RetryNow();
@@ -547,6 +577,8 @@ class SenderService extends ChangeNotifier {
           rethrow;
         } on _FileFailure {
           rethrow;
+        } on _Busy {
+          rethrow;
         } catch (e) {
           if (_cancel) throw _CancelSignal();
           if (_paused) continue;
@@ -596,6 +628,7 @@ class SenderService extends ChangeNotifier {
     final flight = _Inflight(req);
     _inflight[lane] = flight;
     req.headers.set('x-code', pairing.code);
+    req.headers.set('x-transfer', _transfer);
     req.headers.contentType = ContentType.binary;
     req.contentLength = length;
     if (_cancel) flight.abort(_CancelSignal());
@@ -622,6 +655,7 @@ class SenderService extends ChangeNotifier {
       await req.addStream(frames());
       final res = await req.close();
       final text = await utf8.decodeStream(res);
+      if (res.statusCode == 423) throw _Busy();
       if (res.statusCode != 200) throw _Rejected(text);
       batchesSent++;
       return ((jsonDecode(text) as Map)['results'] as Map).cast<String, String>();
@@ -693,6 +727,8 @@ class SenderService extends ChangeNotifier {
         } on _PauseSignal {
           // fall through: on resume, skip what already arrived and send the rest
         } on _CancelSignal {
+          rethrow;
+        } on _Busy {
           rethrow;
         } catch (e) {
           if (_cancel) throw _CancelSignal();
@@ -870,6 +906,7 @@ class SenderService extends ChangeNotifier {
   // ---------------- heartbeat to the new phone ----------------
 
   Map<String, dynamic> _snapshot() => {
+        'seq': _heartbeatSeq++,
         'phase': phase.name,
         'paused': _paused,
         'reconnecting': reconnecting,
@@ -923,6 +960,14 @@ class SenderService extends ChangeNotifier {
   // ---------------- main transfer ----------------
 
   Future<void> run(SendPlan plan) async {
+    if (!debugActAsOtherApp) {
+      final previous = _runningInstance;
+      if (previous != null && !identical(previous, this)) previous.cancel();
+      _runningInstance = this;
+    }
+    _transfer = '$_session-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+    _heartbeatSeq = 0;
+    _maxBytesShown = 0;
     _cancel = false;
     _paused = false;
     reconnecting = false;
@@ -984,12 +1029,24 @@ class SenderService extends ChangeNotifier {
       // 2. Identical content: send once, copy on the new phone.
       final duplicates = fastMode ? await _findDuplicates(toSend) : <FileEntry, String>{};
 
-      await _requestReliably('POST', '/hello', body: {
-        'files': filesToSend,
-        'bytes': totalBytes,
-        'contacts': contactsTotal,
-        'already': present.length,
-      });
+      // If the new phone is still busy with an earlier transfer (e.g. this phone
+      // restarted a moment ago), it frees up after 15 s of silence: wait and retry.
+      for (var attempt = 1;; attempt++) {
+        try {
+          await _requestReliably('POST', '/hello', body: {
+            'files': filesToSend,
+            'bytes': totalBytes,
+            'contacts': contactsTotal,
+            'already': present.length,
+          });
+          break;
+        } on _Busy {
+          if (attempt >= 5 || _cancel) rethrow;
+          statusLine = 'The new phone is still finishing an earlier transfer… trying again';
+          _tick(force: true);
+          await _sleep(const Duration(seconds: 5));
+        }
+      }
       phase = SendPhase.sending;
       statusLine = null;
 
@@ -1129,11 +1186,18 @@ class SenderService extends ChangeNotifier {
       phase = _cancel ? SendPhase.cancelled : SendPhase.done;
     } on _CancelSignal {
       phase = SendPhase.cancelled;
+    } on _Busy {
+      fatalError = 'Another transfer is already sending to the new phone. It may be the older '
+          '“Phone Transfer” app, or an earlier transfer still running in the background. '
+          'Check this phone’s notifications, stop the other transfer, then tap “Continue”. '
+          'Nothing is lost: files that already arrived are skipped.';
+      phase = SendPhase.error;
     } catch (e) {
       fatalError = 'The transfer stopped: ${_describe(e)}\n\n'
           'Tap "Continue" to pick up where it stopped. Files that already arrived are skipped.';
       phase = SendPhase.error;
     } finally {
+      if (identical(_runningInstance, this)) _runningInstance = null;
       _mainPass = false;
       _heartbeat?.cancel();
       _watchdog?.cancel();

@@ -14,6 +14,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [4.2.2] — 2026-11-08
+
+### Fixed
+- **Progress on the new phone flickered** (e.g. between 4% and 11%) when a second transfer was sending to it at the same time, for example the older *Phone Transfer* app, or an earlier transfer still running in the background. Heartbeats from the two overwrote each other.
+  - Every request now carries a **transfer ID**. The new phone accepts **one transfer at a time** and turns others away (HTTP 423) with a clear message on the sending phone. If the active transfer has been silent for 15 s, a new one may take over. The sending phone waits and retries for up to about 25 s first.
+  - Heartbeats carry a **sequence number**. Late or out-of-order ones are ignored, and **progress never goes backwards** on either phone.
+  - **One transfer per phone:** starting a transfer stops any earlier one still running in the background in the same app.
+  - The new phone notes when another sender was turned away.
+- 1 new test: two senders at once (**12 tests**).
+
 ## [4.2.1] — 2026-11-08
 
 ### Fixed

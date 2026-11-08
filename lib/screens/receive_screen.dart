@@ -257,6 +257,7 @@ class _ProgressView extends StatelessWidget {
         filesLine: '${s.filesProcessed} of ${s.expectedFiles} files saved and verified',
         extraLines: [
           if (s.alreadyBeforeStart > 0) '${s.alreadyBeforeStart} files were already here — skipped',
+          if (s.refusedRequests > 0) 'Another phone or app tried to send at the same time and was turned away',
           if (s.expectedContacts > 0) 'Contacts: ${s.contactsAdded} added, ${s.contactsExisting} already here',
         ],
       ),
