@@ -14,6 +14,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [4.2.0] — 2026-11-08
+
+### Why this release
+On a real test, the old phone was running the hotspot and its battery died. The hotspot disappeared, and after the restart the new phone had a different address. The only way to get a fresh QR code was to force-stop the app from Settings. 4.2.0 makes reconnecting a one-tap step.
+
+### Added
+- **New phone shows its address** at the top of the progress screen, so you can compare it with the address the old phone is trying.
+- **"Show QR" button** on the progress screen, with the same pairing code and the current address.
+- **Connection-lost view.** If the old phone goes silent for 15 s in the middle of a transfer, the new phone switches to *Connection to the old phone lost* and shows the QR code. It also says when its own address has changed.
+- **Address refresh.** The new phone re-checks its address every 3 s, so the QR code and address follow hotspot or Wi-Fi changes.
+- **Continue → scanner.** If *Continue previous transfer* can't reach the saved address, the old phone opens the scanner straight away and keeps your category choices.
+- The old phone's *Waiting for the new phone…* banner shows the address it's trying.
+- 1 new test: old phone vanishes mid-file, the new phone's address changes, then reconnecting via the fresh QR completes the transfer exactly (**11 tests**).
+
+## [4.1.0] — 2026-11-08 *(prepared for Google Play, not published)*
+
+- App renamed to **Phone Clone**, with the permanent package name `com.mrajkishor.phoneclone` and target API 36.
+- Release signing through an upload key in `android/key.properties`, which is never committed.
+- New adaptive, themed launcher icon, Play icon and feature graphic.
+- Privacy policy (`PRIVACY.md`) and the Play launch kit in `docs/play-store/`.
+
 ## [4.0.0] — 2026-11-08
 
 ### Why this release

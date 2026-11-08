@@ -88,6 +88,8 @@ void main() {
   tearDown(() {
     ReceiverService.debugBeforeReceive = null;
     ReceiverService.debugProtocolVersion = kProtocolVersion;
+    ReceiverService.ipLookup = () async => '127.0.0.1';
+    ReceiverService.senderSilenceLimit = const Duration(seconds: 15);
     scanned.clear();
     tmp.deleteSync(recursive: true);
   });
@@ -377,6 +379,46 @@ void main() {
     expect(maxLanes, 1);
     expect(snapshot(newRoot), expectedCopy(before));
     s.dispose();
+    await r.stop();
+  });
+
+  test('old phone vanishes, new phone address changes: lost view, fresh QR, same code, transfer completes', () async {
+    final before = snapshot(oldRoot);
+    ReceiverService.senderSilenceLimit = const Duration(milliseconds: 600);
+    final r = await startReceiver();
+    final code = r.pairing!.code;
+    final (s1, plan) = await prepareSender(r);
+    s1.debugOnChunk = (sender, f, bytes) {
+      if (f.rel == 'DCIM/Camera/VID_1.mp4' && bytes > 2000000) sender.cancel(); // battery dies mid-file
+    };
+    // Simulate the battery dying: the old phone stops abruptly, without telling the new phone.
+    s1.debugSkipDone = true;
+    await s1.run(plan);
+    s1.dispose();
+    expect(r.phase, ReceivePhase.receiving);
+
+    // Hotspot restarted: the new phone gets a different address.
+    ReceiverService.ipLookup = () async => '127.0.0.2';
+    await r.refreshAddress();
+    await Future.delayed(const Duration(milliseconds: 1600));
+    expect(r.senderLost, isTrue, reason: 'screen switches to "connection lost" with the QR code');
+    expect(r.addressChanged, isTrue);
+    expect(r.pairing!.host, '127.0.0.2', reason: 'QR shows the new address');
+    expect(r.pairing!.code, code, reason: 'same pairing code');
+    expect(PairingInfo.fromQr(r.pairing!.toQr())!.host, '127.0.0.2');
+
+    // The old phone scans the fresh QR (127.0.0.2 also reaches this test machine) and continues.
+    final s2 = SenderService(PairingInfo.fromQr(r.pairing!.toQr())!)
+      ..stallTimeout = const Duration(milliseconds: 600)
+      ..retryDelays = const [Duration(milliseconds: 50)];
+    await s2.ping();
+    await s2.run(plan);
+    expect(s2.phase, SendPhase.done);
+    expect(r.senderLost, isFalse);
+    expect(r.addressChanged, isFalse);
+    expect(s2.resumedBytes, greaterThan(0), reason: 'the interrupted video continues');
+    expect(snapshot(newRoot), expectedCopy(before));
+    s2.dispose();
     await r.stop();
   });
 }

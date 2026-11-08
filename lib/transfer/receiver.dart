@@ -119,6 +119,10 @@ class ReceiverService extends ChangeNotifier {
   @visibleForTesting
   static Future<String?> Function() ipLookup = localIpAddress;
 
+  /// No request from the old phone for this long during a transfer = connection lost.
+  @visibleForTesting
+  static Duration senderSilenceLimit = const Duration(seconds: 15);
+
   /// Test hook: runs before an upload's bytes are read.
   @visibleForTesting
   static Future<void> Function(String name)? debugBeforeReceive;
@@ -146,6 +150,13 @@ class ReceiverService extends ChangeNotifier {
   Timer? _scanTimer;
 
   PairingInfo? pairing;
+
+  /// True when this phone's address changed since the transfer started
+  /// (e.g. the hotspot was restarted): the old phone must scan the new QR code.
+  bool addressChanged = false;
+  DateTime _lastSenderContact = DateTime.now();
+  bool _wasLost = false;
+  Timer? _addressTimer;
   ReceivePhase phase = ReceivePhase.starting;
   String? fatalError;
   bool senderCancelled = false;
@@ -181,6 +192,24 @@ class ReceiverService extends ChangeNotifier {
   int get failedTotal => finalFailures.length;
   bool get senderPaused => sender['paused'] == true;
   bool get senderReconnecting => sender['reconnecting'] == true;
+
+  /// The old phone has gone quiet in the middle of a transfer (battery died,
+  /// Wi-Fi or hotspot dropped…). The screen then offers the QR code again.
+  bool get senderLost =>
+      phase == ReceivePhase.receiving && DateTime.now().difference(_lastSenderContact) > senderSilenceLimit;
+
+  /// Re-reads this phone's address. The pairing code and port stay the same, so
+  /// only the address in the QR code changes.
+  Future<void> refreshAddress() async {
+    final p = pairing;
+    if (p == null) return;
+    final host = await ipLookup();
+    if (host == null || host == p.host) return;
+    pairing = PairingInfo(host: host, port: p.port, code: p.code);
+    if (phase == ReceivePhase.receiving) addressChanged = true;
+    await _savePairing();
+    notifyListeners();
+  }
   List<Map> get senderDlq => ((sender['dlq'] as List?) ?? const []).cast<Map>();
 
   // Kept for screens that show a single "current file".
@@ -219,7 +248,16 @@ class ReceiverService extends ChangeNotifier {
       _server!.listen(_handle);
       await Native.keepScreenOn(true);
       await Native.startBackgroundService('Ready to receive', 'Waiting for the old phone…', sending: false);
-      _notifyTimer = Timer.periodic(const Duration(seconds: 1), (_) => _updateNotification());
+      _notifyTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _updateNotification();
+        final lost = senderLost;
+        if (lost != _wasLost) {
+          _wasLost = lost;
+          notifyListeners();
+        }
+      });
+      // Networks change (hotspot restarted, Wi-Fi rejoined): keep the address and QR current.
+      _addressTimer = Timer.periodic(const Duration(seconds: 3), (_) => refreshAddress());
       _scanTimer = Timer.periodic(const Duration(seconds: 2), (_) => _flushScans());
       phase = ReceivePhase.waiting;
     } catch (e) {
@@ -231,6 +269,7 @@ class ReceiverService extends ChangeNotifier {
 
   Future<void> stop() async {
     _notifyTimer?.cancel();
+    _addressTimer?.cancel();
     _scanTimer?.cancel();
     _flushScans();
     for (final a in _active.values.toList()) {
@@ -269,7 +308,9 @@ class ReceiverService extends ChangeNotifier {
     final done = sender['bytesDone'] as int? ?? bytesReceived;
     final total = sender['totalBytes'] as int? ?? expectedBytes;
     final pct = total == 0 ? -1 : (done * 100 ~/ total);
-    if (senderPaused) {
+    if (senderLost) {
+      Native.updateNotification('Connection to the old phone lost', 'Open Phone Clone to reconnect', -1);
+    } else if (senderPaused) {
       Native.updateNotification('Transfer paused on the old phone', '${formatBytes(done)} of ${formatBytes(total)}', -1);
     } else if (senderReconnecting) {
       Native.updateNotification('Reconnecting to the old phone…', 'Keep both phones on the same Wi-Fi', -1);
@@ -363,6 +404,8 @@ class ReceiverService extends ChangeNotifier {
       await res.close();
       return;
     }
+    _lastSenderContact = DateTime.now();
+    if (req.uri.path == '/hello') addressChanged = false; // the old phone has the current address
     final v4 = debugProtocolVersion >= 4;
     try {
       Object? reply;

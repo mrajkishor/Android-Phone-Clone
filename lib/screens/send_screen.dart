@@ -71,12 +71,22 @@ class _SendBodyState extends State<_SendBody> {
   /// Continue the last unfinished transfer without scanning the QR code again.
   Future<void> _continueLast() async {
     final last = _last!;
-    final ok = await _connect(last.pairing, quiet: true);
-    if (!ok) {
-      setState(() => _error = 'Couldn’t reach the new phone at ${last.pairing.host}. '
-          'Open the app on the new phone (“This is the NEW phone”). If it shows a different address, '
-          'scan its QR code instead.');
-      return;
+    var ok = await _connect(last.pairing, quiet: true);
+    if (!ok && mounted) {
+      // The new phone's address probably changed (e.g. the hotspot restarted):
+      // go straight to the scanner and keep the previous choices.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('The new phone isn’t at ${last.pairing.host} any more. Scan the QR code it shows now.'),
+      ));
+      final pairing =
+          await Navigator.push<PairingInfo>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
+      if (pairing == null) {
+        setState(() => _error = 'Couldn’t reach the new phone at ${last.pairing.host}. '
+            'On the new phone, tap “Show QR” and scan it from here.');
+        return;
+      }
+      ok = await _connect(pairing);
+      if (!ok) return;
     }
     setState(() {
       _selected
@@ -336,11 +346,13 @@ class _SendBodyState extends State<_SendBody> {
             title: 'Paused',
             subtitle: 'Tap Resume to continue from exactly where it stopped.')
         : s.reconnecting
-            ? const StatusBanner(
+            ? StatusBanner(
                 icon: Icons.wifi_find,
                 color: Colors.deepOrange,
                 title: 'Waiting for the new phone…',
-                subtitle: 'Keep both phones on the same Wi-Fi. The transfer continues automatically.')
+                subtitle: 'Trying ${s.pairing.host}:${s.pairing.port}. Keep both phones on the same Wi-Fi; '
+                    'it continues automatically. If the new phone shows a different address, '
+                    'tap Stop, then scan its QR code (tap “Show QR” on the new phone).')
             : s.phase == SendPhase.retrying
                 ? StatusBanner(
                     icon: Icons.replay,

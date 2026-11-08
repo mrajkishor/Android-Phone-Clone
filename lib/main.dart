@@ -60,7 +60,7 @@ class HomeScreen extends StatelessWidget {
               Text(
                 'Copies photos, videos, music, documents, every other file and contacts, '
                 'checksum-verified and without duplicates. Nothing on the old phone is changed, '
-                'and nothing leaves your local network.  •  v4.1',
+                'and nothing leaves your local network.  •  v4.2',
                 textAlign: TextAlign.center,
                 style: t.bodySmall,
               ),

@@ -839,6 +839,21 @@ No. The app only reads files on the old phone. Nothing is moved, edited or delet
 </details>
 
 <details>
+<summary><b>The old phone was the hotspot and switched off (battery died)</b></summary>
+
+<br>
+
+When the hotspot phone switches off, the network disappears with it. Android doesn't turn the hotspot back on after a restart, and the new phone gets a **new address** when it reconnects. Nothing is lost.
+
+1. Charge the old phone and **turn its hotspot back on**. Make sure the new phone has rejoined it.
+2. **New phone:** it shows *Connection to the old phone lost* with a fresh QR code. You can also tap **Show QR** at any time.
+3. **Old phone:** tap **Continue previous transfer**. If the address changed, the scanner opens by itself. Scan the new phone's QR code and start. Finished files are skipped, and the interrupted file continues where it stopped.
+
+**Tip:** make the **new** phone the hotspot, so a dying old phone can't take the network down.
+
+</details>
+
+<details>
 <summary><b>The transfer stops when the screen is off or the app is in the background</b></summary>
 
 <br>

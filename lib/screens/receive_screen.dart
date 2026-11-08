@@ -73,6 +73,81 @@ class _ReceiveBodyState extends State<_ReceiveBody> {
   }
 }
 
+/// QR code plus the address and code to type in by hand.
+class _PairingCard extends StatelessWidget {
+  final PairingInfo pairing;
+  final double size;
+  const _PairingCard({required this.pairing, this.size = 240});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Center(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+          child: QrImageView(data: pairing.toQr(), size: size, backgroundColor: Colors.white),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Text('Can’t scan? Enter manually:', style: t.bodyMedium, textAlign: TextAlign.center),
+      const SizedBox(height: 8),
+      SelectableText('Address  ${pairing.host}:${pairing.port}', style: t.titleMedium, textAlign: TextAlign.center),
+      SelectableText('Code  ${pairing.code}',
+          style: t.headlineSmall?.copyWith(letterSpacing: 4, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+    ]);
+  }
+}
+
+/// Shows the current QR code; it redraws itself if this phone's address changes.
+void _showPairingDialog(BuildContext context, ReceiverService service) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Connect the old phone again'),
+      content: SingleChildScrollView(
+        child: ListenableBuilder(
+          listenable: service,
+          builder: (_, __) => Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('On the old phone: open Phone Clone → This is the OLD phone → Scan QR code. '
+                'Files already here are skipped; an interrupted file continues where it stopped.'),
+            const SizedBox(height: 16),
+            _PairingCard(pairing: service.pairing!, size: 200),
+          ]),
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+    ),
+  );
+}
+
+/// Top of the progress screen: this phone's address (to compare with the old
+/// phone) and a one-tap way back to the QR code.
+class _AddressBar extends StatelessWidget {
+  final ReceiverService service;
+  const _AddressBar({required this.service});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = service.pairing!;
+    return Row(children: [
+      FilledButton.tonalIcon(
+        onPressed: () => _showPairingDialog(context, service),
+        icon: const Icon(Icons.qr_code_2),
+        label: const Text('Show QR'),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('This phone’s address', style: Theme.of(context).textTheme.labelSmall),
+          SelectableText('${p.host}:${p.port}', style: const TextStyle(fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    ]);
+  }
+}
+
 class _WaitingView extends StatelessWidget {
   final PairingInfo pairing;
   const _WaitingView({required this.pairing});
@@ -85,20 +160,7 @@ class _WaitingView extends StatelessWidget {
         Text('On the OLD phone, open this app, tap “This is the OLD phone” and scan this code.',
             style: t.titleMedium, textAlign: TextAlign.center),
         const SizedBox(height: 24),
-        Center(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-            child: QrImageView(data: pairing.toQr(), size: 240, backgroundColor: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text('Can’t scan? Enter manually:', style: t.bodyMedium, textAlign: TextAlign.center),
-        const SizedBox(height: 8),
-        SelectableText('Address  ${pairing.host}:${pairing.port}', style: t.titleMedium, textAlign: TextAlign.center),
-        SelectableText('Code  ${pairing.code}',
-            style: t.headlineSmall?.copyWith(letterSpacing: 4, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center),
+        _PairingCard(pairing: pairing),
         const SizedBox(height: 16),
         Card(
           elevation: 0,
@@ -161,7 +223,30 @@ class _ProgressView extends StatelessWidget {
     final eta = speed > 0 ? Duration(seconds: ((totalBytes - bytesDone) / speed).ceil()) : null;
     final dlq = s.senderDlq;
 
+    if (s.senderLost) {
+      return ListView(children: [
+        StatusBanner(
+          icon: Icons.link_off,
+          color: Colors.red,
+          title: 'Connection to the old phone lost',
+          subtitle: s.addressChanged
+              ? 'This phone’s address has changed. Scan the QR code below from the old phone to continue.'
+              : 'Check both phones are on the same Wi-Fi or hotspot, then scan this QR code from the old phone.',
+        ),
+        const SizedBox(height: 16),
+        const Text('On the old phone: open Phone Clone → This is the OLD phone → Scan QR code. '
+            'Nothing is lost: files already here are skipped and the interrupted file continues where it stopped.'),
+        const SizedBox(height: 16),
+        _PairingCard(pairing: s.pairing!),
+        const SizedBox(height: 16),
+        Text('Received so far: ${s.filesProcessed} files • ${formatBytes(s.bytesReceived)}',
+            textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+      ]);
+    }
+
     return ListView(children: [
+      _AddressBar(service: s),
+      const SizedBox(height: 12),
       banner,
       const SizedBox(height: 16),
       OverallProgress(

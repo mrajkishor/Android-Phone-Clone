@@ -145,6 +145,10 @@ class SenderService extends ChangeNotifier {
   @visibleForTesting
   void Function(SenderService sender, FileEntry file, int fileBytes)? debugOnChunk;
 
+  /// Test hook: stop like a phone whose battery died (no goodbye to the new phone).
+  @visibleForTesting
+  bool debugSkipDone = false;
+
   final PairingInfo pairing;
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 8)
@@ -1082,6 +1086,7 @@ class SenderService extends ChangeNotifier {
 
       final complete = !_cancel && failedItems.isEmpty;
       try {
+        if (debugSkipDone) throw StateError('test: phone died before saying goodbye');
         receiverReport = await _request('POST', '/done', body: {
           'cancelled': _cancel,
           'complete': complete,
