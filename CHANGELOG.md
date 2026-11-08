@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [4.2.1] — 2026-11-08
+
+### Fixed
+- **"Looking for identical files" looked stuck** on phones with many files. It now shows a progress bar with files and bytes checked (e.g. *1,240 of 5,300 files • 3.2 GB of 9.8 GB*) and the file being checked, updated in steps of at most 20 files or 64 MB.
+- New **"Skip this step and start sending"** button. Identical files are then sent normally, and there are still no duplicates on the new phone.
+
 ## [4.2.0] — 2026-11-08
 
 ### Why this release

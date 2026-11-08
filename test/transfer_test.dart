@@ -321,6 +321,9 @@ void main() {
     expect(s.filesSent, plan.files.length);
     expect(s.batchesSent, greaterThanOrEqualTo(2), reason: '450+ small files go in batches of up to 300');
     expect(s.clonedFiles, 1, reason: 'the second identical picture is copied on the new phone');
+    expect(s.dupCheckTotalFiles, 2);
+    expect(s.dupCheckDoneFiles, 2, reason: 'identical-file check reports its progress');
+    expect(s.dupCheckDoneBytes, s.dupCheckTotalBytes);
     expect(r.clonedFiles, 1);
     expect(maxLanes, greaterThanOrEqualTo(2), reason: 'several files in flight at once');
     expect(snapshot(newRoot), expectedCopy(before), reason: 'every file exact, including the cloned one');

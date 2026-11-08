@@ -20,7 +20,7 @@
 </div>
 
 > [!TIP]
-> **Newest build: Phone Clone 4.2.0** → [`apk/PhoneClone-v4.2.0.apk`](apk/PhoneClone-v4.2.0.apk). This is the Google Play edition (package `com.mrajkishor.phoneclone`), with one-tap reconnect after a dropped connection. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
+> **Newest build: Phone Clone 4.2.1** → [`apk/PhoneClone-v4.2.1.apk`](apk/PhoneClone-v4.2.1.apk). This is the Google Play edition (package `com.mrajkishor.phoneclone`), with one-tap reconnect after a dropped connection. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
 
 ---
 
@@ -641,7 +641,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| **v4.2.0** · *newest build* | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
+| **v4.2.1** · *newest build* | Fix | *Looking for identical files* shows real progress and can be skipped | **~5 min** |
+| v4.2.0 | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
 | v4.1.0 | Play-ready | Renamed **Phone Clone** (`com.mrajkishor.phoneclone`), upload-key signing, new icon, privacy policy, Play launch kit | **~16 min** |
 | [**v4.0.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0) · *latest* | Fast | 2–6 adaptive lanes, small-file batches, duplicate cloning, background checksums, batched media indexing, one-tap Continue, update from v3 mid-transfer | **~15 min** |
 | [v3.0.0](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running | **~16 min** |

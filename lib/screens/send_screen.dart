@@ -330,6 +330,33 @@ class _SendBodyState extends State<_SendBody> {
     final s = _sender!;
 
     if (s.phase == SendPhase.checking || s.phase == SendPhase.idle) {
+      if (s.dupCheckTotalFiles > 0) {
+        // Checking for identical files: show real progress and let the user skip it.
+        final t = Theme.of(context).textTheme;
+        final value = s.dupCheckTotalBytes == 0 ? null : s.dupCheckDoneBytes / s.dupCheckTotalBytes;
+        return Center(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Looking for identical files', style: t.titleLarge, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text('Files saved in more than one place are sent once and copied on the new phone.',
+                style: t.bodySmall, textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            LinearProgressIndicator(value: value, minHeight: 10, borderRadius: BorderRadius.circular(5)),
+            const SizedBox(height: 10),
+            Text('${s.dupCheckDoneFiles} of ${s.dupCheckTotalFiles} files • '
+                '${formatBytes(s.dupCheckDoneBytes)} of ${formatBytes(s.dupCheckTotalBytes)}',
+                textAlign: TextAlign.center),
+            if (s.statusLine != null)
+              Text(s.statusLine!, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall, textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: s.skipDuplicateCheck,
+              icon: const Icon(Icons.skip_next),
+              label: const Text('Skip this step and start sending'),
+            ),
+          ]),
+        );
+      }
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const CircularProgressIndicator(),

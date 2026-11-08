@@ -6,7 +6,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 |---|---|
 | App name | **Phone Clone** |
 | Package (application ID) | `com.mrajkishor.phoneclone` *(permanent: never change it)* |
-| First Play version | **4.2.0** (version code **6**) |
+| First Play version | **4.2.1** (version code **7**) |
 | Target / min SDK | 36 (Android 16) / 24 (Android 7.0) |
 | Format | Android App Bundle (`.aab`), signed with the **upload key** |
 
@@ -21,7 +21,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 - [x] Privacy policy → [`/PRIVACY.md`](../../PRIVACY.md)
 - [x] Store listing text, within Play's character limits → [`listing.md`](listing.md)
 - [x] Ready-to-paste answers for All files access, foreground service, Data safety and other forms → [`declarations.md`](declarations.md)
-- [x] Release `.aab` built and verified (signed with the upload key, version 4.2.0 / code 6)
+- [x] Release `.aab` built and verified (signed with the upload key, version 4.2.1 / code 7)
 
 ## 🧭 When you're ready to launch (your steps)
 
@@ -31,7 +31,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 1. **Create the developer account** at play.google.com/console (US$25 one-time; identity verification).
 2. **Create the app** → name *Phone Clone* → App → Free.
 3. **Play App Signing** → keep the default (*Google generates and protects the app signing key*). Your upload key is the one in `phone-clone-upload.jks`.
-4. **Internal testing** → create a release → upload `PhoneClone-v4.2.0.aab` → add yourself and a few friends → install on two real phones and test a full transfer. Take the **screenshots** here.
+4. **Internal testing** → create a release → upload `PhoneClone-v4.2.1.aab` → add yourself and a few friends → install on two real phones and test a full transfer. Take the **screenshots** here.
 5. **App content** → fill in every form using [`declarations.md`](declarations.md). The **All files access** and **foreground service** forms each need a short screen recording.
 6. **Store listing** → paste from [`listing.md`](listing.md), upload the graphics and screenshots.
 7. **Closed testing** → upload the same bundle → invite **12+ testers** → keep them opted in for **14 days**.

@@ -183,6 +183,21 @@ class SenderService extends ChangeNotifier {
   int clonedFiles = 0; // identical content copied on the new phone instead of sent
   int clonedBytes = 0;
   int batchesSent = 0;
+
+  // Progress of the "looking for identical files" step (shown before sending starts).
+  int dupCheckTotalFiles = 0;
+  int dupCheckDoneFiles = 0;
+  int dupCheckTotalBytes = 0;
+  int dupCheckDoneBytes = 0;
+  bool _skipDuplicateCheck = false;
+
+  /// Skip the identical-file check and start sending right away (identical files
+  /// are then simply sent like any other file).
+  void skipDuplicateCheck() {
+    _skipDuplicateCheck = true;
+    statusLine = 'Skipping the identical-file check…';
+    _tick(force: true);
+  }
   int get bytesDone => min(totalBytes, _completedBytes + lanes.values.fold<int>(0, (s, l) => s + l.bytes));
 
   /// What each lane is sending right now.
@@ -813,12 +828,22 @@ class SenderService extends ChangeNotifier {
       groups.putIfAbsent('${f.size}|${f.rel.split('/').last.toLowerCase()}', () => []).add(f);
     }
     final candidates = [for (final g in groups.values) if (g.length > 1) ...g];
-    if (candidates.isEmpty) return {};
-    statusLine = 'Looking for identical files (${candidates.length})…';
-    _tick(force: true);
+    if (candidates.isEmpty || _skipDuplicateCheck) return {};
+    dupCheckTotalFiles = candidates.length;
+    dupCheckTotalBytes = candidates.fold(0, (s, f) => s + f.size);
+    dupCheckDoneFiles = dupCheckDoneBytes = 0;
     final shaOf = <FileEntry, String>{};
-    for (var i = 0; i < candidates.length && !_cancel; i += 50) {
-      final chunk = candidates.sublist(i, min(i + 50, candidates.length));
+    // Small steps (at most 20 files or 64 MB) so the progress bar keeps moving.
+    var i = 0;
+    while (i < candidates.length && !_cancel && !_skipDuplicateCheck) {
+      final chunk = <FileEntry>[];
+      var chunkBytes = 0;
+      while (i < candidates.length && chunk.length < 20 && (chunk.isEmpty || chunkBytes + candidates[i].size <= 64 << 20)) {
+        chunkBytes += candidates[i].size;
+        chunk.add(candidates[i++]);
+      }
+      statusLine = 'Looking for identical files: ${chunk.first.rel.split('/').last}';
+      _tick(force: true);
       try {
         final shas = await sha256ManyInBackground([for (final f in chunk) f.path]);
         for (var j = 0; j < chunk.length; j++) {
@@ -827,7 +852,11 @@ class SenderService extends ChangeNotifier {
       } catch (_) {
         // unreadable file: leave this chunk to be sent normally
       }
+      dupCheckDoneFiles += chunk.length;
+      dupCheckDoneBytes += chunkBytes;
+      _tick(force: true);
     }
+    statusLine = null;
     final seen = <String>{};
     final dups = <FileEntry, String>{};
     for (final f in candidates) {
@@ -906,6 +935,8 @@ class SenderService extends ChangeNotifier {
     _batchQueue.clear();
     _completedBytes = totalBytes = filesProcessed = filesToSend = resumedBytes = 0;
     clonedFiles = clonedBytes = batchesSent = 0;
+    dupCheckTotalFiles = dupCheckDoneFiles = dupCheckTotalBytes = dupCheckDoneBytes = 0;
+    _skipDuplicateCheck = false;
     retryRound = 0;
     contactsTotal = contactsAdded = contactsExisting = contactsFailed = 0;
     for (final t in tally.values) {
