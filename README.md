@@ -790,6 +790,21 @@ Yes, from v3 to v4 and onwards. Pause, install the update on both phones, open t
 </details>
 
 <details>
+<summary><b>My internet is slow at home. Will the transfer be slow?</b></summary>
+
+<br>
+
+No. The transfer **never uses the internet**: data goes directly between the phones over the local Wi-Fi or hotspot link, so mobile-data or broadband speed doesn't matter. What matters:
+
+- **Distance and walls between the phones.** Keep them side by side, in any room.
+- **The hotspot band.** Choose **5 GHz** if the hotspot settings offer it.
+- **Other traffic on the hotspot.** Cloud photo backups or app updates on the connected phone compete for the same link.
+
+If the connected phone says *Connected, no internet*, that's fine. Turn off *Switch to mobile data automatically* (also called *Adaptive Wi-Fi* or *Wi-Fi+*), so it doesn't drop the hotspot. Keep the hotspot phone charging.
+
+</details>
+
+<details>
 <summary><b>Can I use the phones during the transfer?</b></summary>
 
 <br>
