@@ -41,6 +41,7 @@
 - [FAQ](#-faq)
 - [Troubleshooting](#-troubleshooting)
 - [Known limitations](#-known-limitations)
+- [Author & contributors](#-author--contributors)
 
 ---
 
@@ -614,6 +615,29 @@ Install the same APK (v3.0.0) on both phones.
 - Plain HTTP on the local network, protected by the pairing code only. There's no end-to-end encryption yet.
 - A file that changes after the scan (e.g. still downloading) is reported as failed. Scan again to include the new version.
 - Background running and automatic reconnect are designed for real devices and have **not been tested** on physical phones in the automated suite.
+
+## 👤 Author & contributors
+
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/mrajkishor">
+<img src="https://github.com/mrajkishor.png?size=120" width="100" alt="mrajkishor"><br>
+<b>@mrajkishor</b>
+</a><br>
+<sub>Creator & maintainer · product owner</sub>
+</td>
+<td align="center">
+<a href="https://claude.ai">
+<img src="https://github.com/claude.png?size=120" width="100" alt="Claude"><br>
+<b>Claude</b>
+</a><br>
+<sub>Co-author · code, tests, docs</sub>
+</td>
+</tr>
+</table>
+
+Ideas, bug reports and pull requests are welcome. Open an [issue](https://github.com/mrajkishor/Android-Phone-Clone/issues) to get started.
 
 ---
 
