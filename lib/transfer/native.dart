@@ -122,6 +122,12 @@ class NativeExtras {
   static Future<bool> openFilesApp([String? folder]) async =>
       await _c.invokeMethod<bool>('openFilesApp', {'folder': folder}) ?? false;
 
+  /// Opens the phone's Files app in the folder that holds [path] (an absolute file path).
+  static Future<bool> showInFilesApp(String path) async {
+    final i = path.lastIndexOf('/');
+    return await _c.invokeMethod<bool>('openFilesApp', {'dir': i <= 0 ? path : path.substring(0, i)}) ?? false;
+  }
+
   // ---- thumbnails (both phones) ----
   /// {package, label, versionName, icon (PNG)} from an APK file, or null for a split part.
   static Future<Map<String, dynamic>?> apkMeta(String path) async {

@@ -142,7 +142,7 @@ class ExtrasBridge(private val ctx: Context) {
 
             // ---------------- open in the phone's own apps ----------------
             "openFile" -> result.success(openFile(call.argument<String>("path")!!))
-            "openFilesApp" -> result.success(openFilesApp(call.argument<String>("folder")))
+            "openFilesApp" -> result.success(openFilesApp(call.argument<String>("folder"), call.argument<String>("dir")))
 
             // ---------------- thumbnails for the Files tab ----------------
             "apkMeta" -> bg(result) { apkMeta(call.argument<String>("path")!!) }
@@ -666,10 +666,20 @@ class ExtrasBridge(private val ctx: Context) {
     }
 
     /** Opens the phone's Files app, at [folder] (relative to internal storage) where the phone supports it. */
-    private fun openFilesApp(folder: String?): Boolean {
+    private fun openFilesApp(folder: String?, dir: String? = null): Boolean {
         val authority = "com.android.externalstorage.documents"
-        if (folder != null && Build.VERSION.SDK_INT >= 26) {
-            val doc = android.provider.DocumentsContract.buildDocumentUri(authority, "primary:$folder")
+        // [dir] is an absolute folder: internal storage ("primary:…") or an SD card ("1234-ABCD:…").
+        val docId = when {
+            dir != null -> {
+                val internal = android.os.Environment.getExternalStorageDirectory().absolutePath
+                if (dir == internal || dir.startsWith("$internal/")) "primary:" + dir.removePrefix(internal).trimStart('/')
+                else Regex("^/storage/([^/]+)/?(.*)$").find(dir)?.let { "${it.groupValues[1]}:${it.groupValues[2]}" }
+            }
+            folder != null -> "primary:$folder"
+            else -> null
+        }
+        if (docId != null && Build.VERSION.SDK_INT >= 26) {
+            val doc = android.provider.DocumentsContract.buildDocumentUri(authority, docId)
             val atFolder = Intent(Intent.ACTION_VIEW).setDataAndType(doc, "vnd.android.document/directory")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             if (startOrFalse(atFolder)) return true

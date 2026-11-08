@@ -325,7 +325,7 @@ class _FileCompareListState extends State<FileCompareList> {
       ]),
       Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Text('Tap a file to open it.',
+        child: Text('Tap a file to open it, or use its folder icon to see it in the Files app.',
             style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ),
       const SizedBox(height: 6),
@@ -431,6 +431,17 @@ class _FileCompareListState extends State<FileCompareList> {
     if (result == 'notHere') _say(context, 'This file isn’t on this phone any more.');
   }
 
+  /// The file can be shown in the Files app: it is on this phone's shared storage.
+  static bool _inSharedStorage(FileRow r) => r.path?.startsWith('/storage/') ?? false;
+
+  Future<void> _showInFolder(BuildContext context, FileRow r) async {
+    var ok = false;
+    try {
+      ok = await NativeExtras.showInFilesApp(r.path!);
+    } catch (_) {}
+    if (!ok && context.mounted) _say(context, 'Couldn’t open the Files app on this phone.');
+  }
+
   Widget _row(FileRow r) {
     final (icon, color, label) = _look(r.status);
     final apps = r.rel.startsWith('PhoneClone/Apps/');
@@ -440,17 +451,52 @@ class _FileCompareListState extends State<FileCompareList> {
         : slash < 0
             ? 'Main folder'
             : r.rel.substring(0, slash);
+    final here = r.path != null && r.status != 'restricted';
+    final canOpen = here && !apps;
+    final canShow = here && _inSharedStorage(r);
     return ListTile(
       dense: true,
-      contentPadding: const EdgeInsets.only(left: 12, right: 8),
-      leading: FileThumb(rel: r.rel, path: r.path, category: r.status == 'restricted' ? null : r.category),
+      contentPadding: const EdgeInsets.only(left: 12, right: 0),
+      // Thumbnail with a small status badge, like a gallery.
+      leading: SizedBox.square(
+        dimension: FileThumb.size + 4,
+        child: Stack(clipBehavior: Clip.none, children: [
+          FileThumb(rel: r.rel, path: r.path, category: r.status == 'restricted' ? null : r.category),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Tooltip(
+              message: label,
+              child: Container(
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, shape: BoxShape.circle),
+                padding: const EdgeInsets.all(1),
+                child: Icon(icon, color: color, size: 16),
+              ),
+            ),
+          ),
+        ]),
+      ),
       title: FileTitle(rel: r.rel, path: r.path),
       subtitle: Text(
-        [where, if (r.size > 0) formatBytes(r.size), if (r.error != null) r.error!].join(' • '),
-        maxLines: r.error == null ? 1 : 3,
+        '${[where, if (r.size > 0) formatBytes(r.size)].join(' • ')}\n$label${r.error == null ? '' : ': ${r.error}'}',
+        maxLines: r.error == null ? 2 : 3,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Tooltip(message: label, child: Icon(icon, color: color, size: 20)),
+      isThreeLine: true,
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        IconButton(
+          tooltip: 'Open',
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.open_in_new, size: 20),
+          onPressed: canOpen ? () => _openFile(context, r) : null,
+        ),
+        IconButton(
+          tooltip: 'Show in Files app',
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.folder_open_outlined, size: 20),
+          onPressed: canShow ? () => _showInFolder(context, r) : null,
+        ),
+      ]),
       onTap: () => _openFile(context, r),
     );
   }

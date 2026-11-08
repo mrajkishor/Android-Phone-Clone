@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.5.0](#550--2026-11-09) | Preview: every file has Open and Show in Files app buttons | 5 | ✅ | ~15 min |
 | [5.4.1](#541--2026-11-09) | Preview fix: both phones always show the same Extras numbers | 5 | ✅ | ~20 min |
 | [5.4.0](#540--2026-11-09) | Preview: tap a file to open it; open folders in the Files app | 5 | ✅ | ~15 min |
 | [5.3.0](#530--2026-11-09) | Preview: "Last transfer" on the home screen; new phone lists files already there; correct version in the app | 5 | ✅ | ~25 min |
@@ -21,6 +22,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 > v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [5.5.0] — 2026-11-09 *(preview, restricted access)*
+
+### Added
+- **Two buttons on every file** in the Files view (during a transfer and in *Last transfer*):
+  - **Open**: opens it in the phone's own app (Gallery, PDF viewer, player…).
+  - **Show in Files app**: opens the phone's Files app in the folder that holds it. It works for internal storage and SD cards, on phones that support it.
+- The buttons are greyed out when a file isn't on this phone (waiting, failed or restricted). App installers can be shown in the Files app but are installed from the Extras tab.
+
+### Changed
+- The file's status moved to a small badge on its thumbnail, and to its own line under the folder and size, so it's never cut off.
 
 ## [5.4.1] — 2026-11-09 *(preview, restricted access)*
 

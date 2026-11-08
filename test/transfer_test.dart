@@ -726,6 +726,11 @@ void main() {
     await tester.tap(find.text('x.pdf'));
     await tester.pump();
     expect(calls, ['openFile /storage/emulated/0/Documents/x.pdf']);
+    await tester.tap(find.byTooltip('Open').first);
+    await tester.pump();
+    await tester.tap(find.byTooltip('Show in Files app').first);
+    await tester.pump();
+    expect(calls.sublist(1), ['openFile /storage/emulated/0/Documents/x.pdf', 'openFilesApp /storage/emulated/0/Documents']);
 
     await tester.tap(find.text('Archives'));
     await tester.pump();
