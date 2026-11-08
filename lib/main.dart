@@ -1,0 +1,119 @@
+import 'package:flutter/material.dart';
+
+import 'screens/receive_screen.dart';
+import 'screens/send_screen.dart';
+
+void main() => runApp(const PhoneTransferApp());
+
+class PhoneTransferApp extends StatelessWidget {
+  const PhoneTransferApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const seed = Color(0xFF1B6EF3);
+    return MaterialApp(
+      title: 'Phone Transfer',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true),
+      darkTheme: ThemeData(colorSchemeSeed: seed, brightness: Brightness.dark, useMaterial3: true),
+      home: const HomeScreen(),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 24),
+              Text('Phone Transfer', style: t.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(
+                'Install this app on both phones. Connect them to the same Wi-Fi, '
+                'or turn on hotspot on the new phone and join it from the old one.',
+                style: t.bodyMedium,
+              ),
+              const SizedBox(height: 32),
+              _RoleCard(
+                icon: Icons.download_rounded,
+                title: 'This is the NEW phone',
+                subtitle: 'Receive data — shows a QR code',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiveScreen())),
+              ),
+              const SizedBox(height: 16),
+              _RoleCard(
+                icon: Icons.upload_rounded,
+                title: 'This is the OLD phone',
+                subtitle: 'Send data — scan the QR code on the new phone',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SendScreen())),
+              ),
+              const Spacer(),
+              Text(
+                'Copies photos, videos, music, documents, every other file and contacts, '
+                'checksum-verified and without duplicates. Nothing on the old phone is changed, '
+                'and nothing leaves your local network.  •  v3.0',
+                textAlign: TextAlign.center,
+                style: t.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _RoleCard({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      color: cs.primaryContainer,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              Icon(icon, size: 40, color: cs.onPrimaryContainer),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold, color: cs.onPrimaryContainer)),
+                    const SizedBox(height: 4),
+                    Text(subtitle, style: TextStyle(color: cs.onPrimaryContainer)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: cs.onPrimaryContainer),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

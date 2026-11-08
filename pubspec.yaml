@@ -1,0 +1,28 @@
+name: phone_transfer
+description: Copy everything from an old Android phone to a new one over Wi-Fi, verified and without duplicates.
+publish_to: "none"
+version: 3.0.0+3
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"  # Flutter 3.24+
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_contacts: ^2.6.0     # read & write contacts (vCard)
+  permission_handler: ^13.0.2  # runtime permissions
+  qr_flutter: ^4.1.0           # show pairing QR on the new phone
+  mobile_scanner: ^7.5.0       # scan pairing QR on the old phone
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  crypto: ^3.0.6               # SHA-256 checksums
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

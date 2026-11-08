@@ -1,0 +1,100 @@
+# Changelog
+
+All notable changes to **Android Phone Clone (Phone Transfer)** are listed here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+
+| Version | Theme | Protocol | Install over previous? |
+|---|---|:---:|:---:|
+| [3.0.0](#300--2026-11-08) | Unstoppable: survives timeouts, drops, pauses and the app being closed | 3 | ✅ |
+| [2.0.0](#200--2026-11-08) | Exact: same folders, same dates, verified, no duplicates | 2 | ✅ |
+| [1.0.0](#100--2026-11-08) | It works: first Wi-Fi transfer between two phones | 1 | — |
+
+> Each version changed the network protocol, so **both phones must run the same version**.
+
+---
+
+## [3.0.0] — 2026-11-08
+
+### Why this release
+v2 made every copy exact. Long transfers could still go wrong, though. A file that stalled held up everything behind it, a Wi-Fi drop failed every remaining file, there was no way to take a break, a half-sent 4 GB video started over from zero, and closing the app stopped the transfer. v3 fixes all of that.
+
+### Added
+- **Live, byte-level progress.** Both phones show the file in flight (name, folder, bytes so far out of the total, % and a progress bar), updated about 10 times a second, plus a *Just finished* list.
+- **Stall timeout.** A file with no progress for **20 s** is aborted and skipped, and the transfer moves on to the next file.
+- **Retry queue (DLQ).** Skipped and failed files are listed on both phones with their path, attempt count and last error. The queue is retried **after all other files**, in rounds with **exponential backoff** (5 s → 10 s → 20 s → 40 s, ±20% jitter), up to **5 attempts** per file.
+- **Final report.** A 🎉 *Hurray!* screen when everything arrives. Otherwise, each failed file with its **full path and error**, a **Copy list** button for moving files manually, and a **Try the failed files again** button.
+- **Pause / Resume.** Pause stops mid-file. Resume continues from the **exact byte** where it stopped. The stall timeout doesn't count while paused.
+- **Byte-level resume.** The new phone keeps partly received files in a hidden staging folder. Pauses, retries, reconnects and even app restarts continue from the last received byte instead of starting the file over.
+- **Automatic reconnect.** If the new phone becomes unreachable, the app shows *Waiting for the new phone…*, re-checks with backoff (2 s → 4 s → 8 s → 15 s), and carries on when it's back. A connection drop is not counted as a file failure.
+- **Background running.** An Android foreground service with a progress notification, a CPU wake lock and a Wi-Fi lock. The Flutter engine is owned by the app process instead of the screen, so the transfer continues after pressing Back or Home, or after swiping the app away. Tapping the notification reopens the running transfer.
+- **Status mirroring.** The old phone sends a heartbeat every second, so the new phone shows the same overall progress, paused or reconnecting state, and retry queue.
+- New protocol endpoints: `/status` (resume point), `/state` (heartbeat). `/upload` now takes an `offset`.
+- Tests for: a stalled file being queued and recovered after the others, a permanently failing file ending up in the final list with its path and error, and pause mid-file resuming at the same byte. That's **6 end-to-end tests** in total.
+
+### Changed
+- **Duplicate detection** is now described as an *index*: path + size + modified time → SHA-256 and saved location, stored persistently on the new phone. It's checked before every run, and a content check still applies if the index is lost.
+- The staging folder is no longer wiped when the app starts. It's cleared only after a fully successful transfer, so partial files can resume.
+- Upload IDs are now stable per file version (derived from its key), which is what allows resuming across sessions.
+- The Back button during a transfer sends the app to the background instead of asking to stop.
+- Protocol version **2 → 3**.
+
+### Fixed
+- An older upload that was stuck (for example, after a network drop) could still be writing when a newer retry of the same file started. Now only one writer per file is allowed. A newer request takes over immediately and the older one steps aside.
+
+---
+
+## [2.0.0] — 2026-11-08
+
+### Why this release
+A line-by-line review of v1 against two requirements — *"nothing on the old phone changes"* and *"nothing on the new phone is duplicated, modified or missed"* — found that the first held but the second didn't. On top of that, documents had to be picked by hand, so files could easily be missed.
+
+### Added
+- **Automatic detection of every file.** With *All files access*, the old phone scans its entire storage (including SD cards) in a background isolate and groups files into Photos, Videos, Music & audio, Documents, Archives, App installers (APK), Other media, Other files, and Hidden files (off by default). Each group shows a count and size, with an on/off switch.
+- **Same folders.** Every file is written to the same relative path it had on the old phone, such as `DCIM/Camera` or `Documents/Bills`.
+- **Original dates.** The modified time is restored and Android's media index is refreshed, so the gallery timeline is unchanged.
+- **SHA-256 verification.** The old phone hashes while streaming, the new phone hashes what it received, and a file is only kept if the two match. A mismatched file is re-sent, up to 3 tries.
+- **Duplicate protection.**
+  - A persistent record of received files lets repeat runs skip what's already there.
+  - A file with the same name and checksum is never written twice, even if the record is lost.
+  - A different file with the same name is saved beside it as `name (1).ext`.
+  - A repeated commit is recognised and doesn't create a copy.
+- **Resume after interruption.** *Send again* continues and skips files that already arrived.
+- **Contacts:** sent as JSON with all fields and full-size photos. Contacts that already exist (same phone number or email) are skipped.
+- **Progress in bytes**, with percentage, speed and time left.
+- **Reports on both phones**: copied, already there and failed, for each category.
+- **Permission screen** explaining *All files access*, with a button that opens the right Settings screen.
+- The first **end-to-end tests**: scan classification, exact copy with the old phone unchanged, re-runs, a lost record, a name clash, and stop-and-resume.
+
+### Changed
+- Dependencies trimmed: `photo_manager`, `file_picker`, `network_info_plus` and `wakelock_plus` were replaced with small native helpers in `MainActivity.kt` (media index query, storage roots, file dates, keep screen on).
+- Protocol version **1 → 2** (two-step upload → commit).
+
+### Removed
+- Manual file picking. Every file is now found automatically.
+
+---
+
+## [1.0.0] — 2026-11-08
+
+### Added
+- First release: a Flutter app for Android that transfers data from an old phone to a new one over **local Wi-Fi or hotspot**, with no cloud involved.
+- **Pairing by QR code.** The new phone shows its address and a 6-digit code, and the old phone scans it. Manual entry is also available.
+- Transfers **photos, videos, music, contacts** (as vCards), and **documents you pick by hand**.
+- Photos and videos are saved to the Gallery, music to `Music/PhoneTransfer`, and files to `Download/PhoneTransfer`.
+- Progress by file count, with a summary on both phones.
+- Up to 3 retries per file; screen kept on during the transfer.
+
+### Fixed (during the first build)
+- Updated plugins to versions compatible with current Android SDKs (`file_picker`, `flutter_contacts`, `mobile_scanner`, `permission_handler`), and adapted the code to their new APIs.
+- Raised `compileSdk` to 37 and reduced Gradle memory so the release build completes.
+
+### Known issues (fixed in 2.0.0)
+- Photos and videos got *today's* date, which mixed up the gallery timeline.
+- Albums were merged into one folder.
+- Running the transfer twice duplicated everything, and contacts synced through Google could appear twice.
+- No checksum verification.
+- Documents had to be picked by hand, so files could be missed.
+
+[3.0.0]: https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0
+[2.0.0]: #200--2026-11-08
+[1.0.0]: #100--2026-11-08
