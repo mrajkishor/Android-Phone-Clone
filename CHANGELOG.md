@@ -3,7 +3,7 @@
 All notable changes to **Android Phone Clone (Phone Transfer)** are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-> **Latest release: 4.2.2.** 5.x is a **preview that needs restricted access** (SMS, call log and more); see the [README](README.md#-v5-preview-needs-restricted-access).
+> **Latest release: 5.5.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
@@ -23,7 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [5.5.0] — 2026-11-09 *(preview, restricted access)*
+## [5.5.0] — 2026-11-09 *(latest release)*
 
 ### Added
 - **Two buttons on every file** in the Files view (during a transfer and in *Last transfer*):
@@ -34,7 +34,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 - The file's status moved to a small badge on its thumbnail, and to its own line under the folder and size, so it's never cut off.
 
-## [5.4.1] — 2026-11-09 *(preview, restricted access)*
+## [5.4.1] — 2026-11-09
 
 ### Fixed
 - **Installed apps: the two phones disagreed** (one said all added, the other said they couldn't be added). Once the new phone's app had been closed or reinstalled, it no longer remembered where the app installers from an earlier transfer were, even though they were on disk.
@@ -46,7 +46,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Call history and messages: the old phone's total is now what was actually read, so both phones show the same totals.
 - The test now restarts the new phone between transfers and checks that both phones show identical numbers for every extra (**16 tests**).
 
-## [5.4.0] — 2026-11-09 *(preview, restricted access)*
+## [5.4.0] — 2026-11-09
 
 ### Added
 - **Tap a file to open it** in the phone's own app (Gallery, PDF viewer, video player…), wherever the Files view appears: during a transfer and in *Last transfer*. Android asks which app if there's more than one.
@@ -54,7 +54,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Clear messages instead of silence: *"This file isn't on this phone yet"*, *"No app on this phone can open this type of file"*, and the reason for restricted items. App installers point to the Extras tab.
 - 1 new test (**16 tests**).
 
-## [5.3.0] — 2026-11-09 *(preview, restricted access)*
+## [5.3.0] — 2026-11-09
 
 ### Added
 - **"Last transfer" on the home screen**, on both phones. A card shows when it was, how it ended, and how many files and how much data. Tap it to open the same grouped Files view (type / folder / status, thumbnails, filters, search) without the phones being connected. *Clear list* removes only the list, never files. The next transfer replaces it.

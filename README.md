@@ -4,14 +4,14 @@
 
 ### Move *everything* from your old Android phone to your new one — over Wi-Fi, fast, verified, without duplicates.
 
-[![Release](https://img.shields.io/badge/release-v4.2.2-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)
-[![Preview](https://img.shields.io/badge/preview-v5.5.0%20(restricted%20access)-orange?style=for-the-badge)](#-v5-preview-needs-restricted-access)
+[![Release](https://img.shields.io/badge/release-v5.5.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.5.0)
+[![Standard edition](https://img.shields.io/badge/standard%20permissions-v4.2.2-blue?style=for-the-badge)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Tests](https://img.shields.io/badge/tests-16%20passing-brightgreen?style=for-the-badge)](#-testing)
 [![No cloud](https://img.shields.io/badge/cloud-none-lightgrey?style=for-the-badge)](#-privacy--safety)
 
-**[⬇️ Download the APK (v4.2.2)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)** ·
+**[⬇️ Download the APK (v5.5.0)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.5.0)** ·
 [Quick start](#-quick-start) ·
 [Features](#-features) ·
 [How it works](#-how-it-works) ·
@@ -21,10 +21,10 @@
 </div>
 
 > [!TIP]
-> **Latest release: Phone Clone 4.2.2** → [`apk/PhoneClone-v4.2.2.apk`](apk/PhoneClone-v4.2.2.apk). Uses only standard permissions (files, contacts, camera for the QR code). This is the Google Play edition (package `com.mrajkishor.phoneclone`). It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
+> **Latest release: Phone Clone 5.5.0** → [`apk/PhoneClone-v5.5.0.apk`](apk/PhoneClone-v5.5.0.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and the home screen keeps a **Last transfer** summary. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs.
 
 > [!WARNING]
-> **v5 is a preview that needs restricted access.** [`apk/PhoneClone-v5.5.0.apk`](apk/PhoneClone-v5.5.0.apk) also moves messages, call history and more, but asks for **invasive permissions**. Google Play Protect may block it when installed from WhatsApp or a browser, and Google Play allows it only after a manual review. See [v5 preview](#-v5-preview-needs-restricted-access).
+> **Some v5 Extras need restricted access.** Messages and call history use permissions that Google restricts, so **Play Protect may block the install from WhatsApp or a browser**. Install it over USB (`adb install`) or turn off Play Protect scanning while installing. Google Play allows them only after a manual review. See [Extras that need restricted access](#-v5-extras-that-need-restricted-access). Prefer standard permissions only? Use **[v4.2.2](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)** ([`apk/PhoneClone-v4.2.2.apk`](apk/PhoneClone-v4.2.2.apk)).
 
 ---
 
@@ -35,7 +35,7 @@
 - [Quick start](#-quick-start)
 - [Upgrading from v3](#%EF%B8%8F-upgrading-from-v3)
 - [What gets transferred](#-what-gets-transferred)
-- [v5 preview: needs restricted access](#-v5-preview-needs-restricted-access)
+- [v5: Extras that need restricted access](#-v5-extras-that-need-restricted-access)
 - [The transfer screen, explained](#-the-transfer-screen-explained)
 - [How it works](#-how-it-works)
 - [Speed: how v4 goes faster](#-speed-how-v4-goes-faster)
@@ -257,7 +257,7 @@ The app shows which mode it's in while sending.
 | 🙈 **Hidden files** | Files in hidden folders — mostly caches and thumbnails | ⬜ |
 | 👤 **Contacts** | All fields + full-size photos, **with their groups**; existing contacts skipped | ✅ |
 
-v5 can also move messages, call history, calendar, installed apps, wallpaper and ringtones; see [v5 preview](#-v5-preview-needs-restricted-access) below.
+v5 can also move messages, call history, calendar, installed apps, wallpaper and ringtones; see [v5 Extras](#-v5-extras-that-need-restricted-access) below.
 
 <details>
 <summary><b>❌ What still can't be transferred (and why)</b></summary>
@@ -279,9 +279,9 @@ Android reserves these for system tools such as Google's setup restore or Samsun
 
 ---
 
-## 🧪 v5 preview: needs restricted access
+## 🔐 v5: Extras that need restricted access
 
-v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), notifications and the network. v5 adds an **Extras** section that needs more access. Some of it is **invasive or restricted by Google**, so **v4.2.2 stays the latest release**. v5 is kept as a preview for people who install it themselves (e.g. over USB with `adb install`).
+v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), notifications and the network. v5 adds an **Extras** section that needs more access, and some of it is **invasive or restricted by Google**. Every Extra is optional: it's a switch on the old phone, and each permission is asked in a popup first. **v4.2.2** stays available as the standard-permissions edition.
 
 | Extra (v5) | Access needed | Verdict |
 |---|---|:---:|
@@ -298,10 +298,7 @@ v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), 
 - **Google Play** allows SMS and call-log access only for default SMS / phone apps, or after a manual review for a narrow *backup and restore* exception. Approval is uncertain.
 - In the app, these features carry a red **Restricted** or amber **Sensitive** label, and every permission is asked in a popup first.
 
-<details>
-<summary><b>Also in v5 (not invasive)</b></summary>
-
-<br>
+### ✨ Also new in v5 (standard permissions)
 
 - **Files** tab on both phones: every file compared old vs new, grouped by type / folder / status with coloured bars, thumbnails, app names and icons, filters and search.
 - **Extras** tab with plain status and **Try again**.
@@ -311,7 +308,7 @@ v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), 
 - Every file has **Open** and **Show in Files app** buttons.
 - **Last transfer** on the home screen of both phones: tap it to see every file, grouped, even after the phones are disconnected.
 
-</details>
+
 
 ---
 
@@ -580,7 +577,7 @@ Contacts use their own check: phone numbers (last 10 digits), email addresses, o
 | Foreground service, wake lock | both | Keep the transfer running with the screen off |
 | Network / Wi-Fi state | both | Local connection between the phones |
 
-**v5 preview only** (not in the 4.2.2 release):
+**v5 Extras only** (not in v4.2.2):
 
 | Permission | Phone | Why | |
 |---|---|---|:---:|
@@ -696,14 +693,14 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| v5.5.0 · *preview, restricted access* | Actions | Every file has **Open** and **Show in Files app** buttons; status badge on the thumbnail | **~15 min** |
-| v5.4.1 · *preview* | Fix | Both phones always show the same Extras numbers (installed apps, ringtones, wallpaper) | **~20 min** |
-| v5.4.0 · *preview* | Open | Tap a file to open it in the phone's own app; open folders in the Files app | **~15 min** |
-| v5.3.0 · *preview* | Recap | **Last transfer** card on the home screen with the full Files view; new phone lists files already there; albums tip; correct version | **~25 min** |
-| v5.2.0 · *preview* | Clarity | Thumbnails and app names/icons in the Files tab; Extras cards with plain status and **Try again** on both phones; no stuck spinners | **~30 min** |
-| v5.1.0 · *preview* | Polish | Skips files already on the new phone even after a reinstall; **grouped Files tab** (type / folder / status) with bars; **Restricted** items marked; WhatsApp *Transfer chats* | **~25 min** |
-| v5.0.0 · *preview* | Everything | Messages, call history, calendar, installed apps, wallpaper, ringtones, contact groups, WhatsApp guidance; **Progress / Files / Extras** tabs on both phones | **~45 min** |
-| [**v4.2.2**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2) · *latest release* | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
+| [**v5.5.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.5.0) · *latest release* | Actions | Every file has **Open** and **Show in Files app** buttons; status badge on the thumbnail | **~15 min** |
+| v5.4.1 | Fix | Both phones always show the same Extras numbers (installed apps, ringtones, wallpaper) | **~20 min** |
+| v5.4.0 | Open | Tap a file to open it in the phone's own app; open folders in the Files app | **~15 min** |
+| v5.3.0 | Recap | **Last transfer** card on the home screen with the full Files view; new phone lists files already there; albums tip; correct version | **~25 min** |
+| v5.2.0 | Clarity | Thumbnails and app names/icons in the Files tab; Extras cards with plain status and **Try again** on both phones; no stuck spinners | **~30 min** |
+| v5.1.0 | Polish | Skips files already on the new phone even after a reinstall; **grouped Files tab** (type / folder / status) with bars; **Restricted** items marked; WhatsApp *Transfer chats* | **~25 min** |
+| v5.0.0 | Everything | Messages, call history, calendar, installed apps, wallpaper, ringtones, contact groups, WhatsApp guidance; **Progress / Files / Extras** tabs on both phones | **~45 min** |
+| [**v4.2.2**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2) · *standard permissions* | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
 | v4.2.1 | Fix | *Looking for identical files* shows real progress and can be skipped | **~5 min** |
 | v4.2.0 | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
 | v4.1.0 | Play-ready | Renamed **Phone Clone** (`com.mrajkishor.phoneclone`), upload-key signing, new icon, privacy policy, Play launch kit | **~16 min** |
@@ -974,7 +971,7 @@ v4 works with v3 phones in compatibility mode. This message only appears with mu
 ## ⚠️ Known limitations
 
 - Android 15 limits this kind of background service to **6 hours per day**.
-- Fast mode needs **v4 on both phones**; with a v3 phone, files go one at a time. Extras (messages, calls, …) exist only in the **v5 preview** and need it on both phones.
+- Fast mode needs **v4 on both phones**; with a v3 phone, files go one at a time. Extras (messages, calls, …) need **v5 on both phones**.
 - Reinstalled apps start fresh: app data and logins are not included (Android doesn't allow it).
 - On Android 10+, handing the SMS role back goes through *Settings → Default apps*, which the **Switch back** button opens.
 - Plain HTTP on the local network, protected by the pairing code only. There's no end-to-end encryption yet.

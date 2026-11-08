@@ -40,6 +40,7 @@ jobs:
               v3.0.0) title="v3.0.0 — Unstoppable" ;;
               v4.0.0) title="v4.0.0 — Fast" ;;
               v4.2.2) title="Phone Clone 4.2.2" ;;
+              v5.5.0) title="Phone Clone 5.5.0" ;;
             esac
             args=(--target "$GITHUB_SHA" --title "$title" --notes-file "$notes")
             [ "$tag" = "$latest" ] && args+=(--latest)
