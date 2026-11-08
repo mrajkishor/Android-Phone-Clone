@@ -3,11 +3,11 @@
 All notable changes to **Android Phone Clone (Phone Transfer)** are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-| Version | Theme | Protocol | Install over previous? |
-|---|---|:---:|:---:|
-| [3.0.0](#300--2026-11-08) | Unstoppable: survives timeouts, drops, pauses and the app being closed | 3 | ✅ |
-| [2.0.0](#200--2026-11-08) | Exact: same folders, same dates, verified, no duplicates | 2 | ✅ |
-| [1.0.0](#100--2026-11-08) | It works: first Wi-Fi transfer between two phones | 1 | — |
+| Version | Theme | Protocol | Install over previous? | Build time |
+|---|---|:---:|:---:|:---:|
+| [3.0.0](#300--2026-11-08) | Unstoppable: survives timeouts, drops, pauses and the app being closed | 3 | ✅ | ~16 min |
+| [2.0.0](#200--2026-11-08) | Exact: same folders, same dates, verified, no duplicates | 2 | ✅ | ~14 min |
+| [1.0.0](#100--2026-11-08) | It works: first Wi-Fi transfer between two phones | 1 | — | ~43 min |
 
 > Each version changed the network protocol, so **both phones must run the same version**.
 

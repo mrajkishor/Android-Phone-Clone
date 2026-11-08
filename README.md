@@ -499,11 +499,40 @@ apk/PhoneTransfer-v3.0.0.apk        # Ready-to-install build
 
 ## 🕰️ Version history
 
-| Version | Theme | Highlights |
-|---|---|---|
-| [**v3.0.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) · *latest* | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running |
-| v2.0.0 | Exact | Automatic file detection, same folders & dates, SHA-256, index, contact dedupe |
-| v1.0.0 | It works | Photos, videos, music, contacts, hand-picked files over Wi-Fi with QR pairing |
+| Version | Theme | Highlights | ⏱️ Build time |
+|---|---|---|:---:|
+| [**v3.0.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) · *latest* | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running | **~16 min** |
+| v2.0.0 | Exact | Automatic file detection, same folders & dates, SHA-256, index, contact dedupe | **~14 min** |
+| v1.0.0 | It works | Photos, videos, music, contacts, hand-picked files over Wi-Fi with QR pairing | **~43 min** |
+
+### ⏱️ How long it took
+
+The whole app went from idea to v3 release on **8 November 2026**, built in conversation between [@mrajkishor](https://github.com/mrajkishor) and Claude. Times are measured from each request to the finished, installable APK (IST):
+
+| Version | Requested | APK ready | Build time | What the time went into |
+|---|:---:|:---:|:---:|---|
+| **v1.0.0** | 12:25 | 13:08 | **~43 min** | First code base (~10 min). Then setting up the Flutter & Android SDKs, upgrading plugins to current versions, and fixing build issues to produce the first APK |
+| **v2.0.0** | 15:20 | 15:34 | **~14 min** | Automatic file detection, checksum + commit protocol, index, same folders & dates, contact dedupe, new screens, first end-to-end tests. *Preceded by a ~15 min review of v1 (from 15:03) that found the gaps v2 fixes* |
+| **v3.0.0** | 15:49 | 16:05 | **~16 min** | Resumable uploads, stall watchdog, retry queue with backoff, pause/resume, reconnect, background service, live per-file progress, 3 new tests |
+| **Repo & docs** | 16:57 | 17:15 | **~18 min** | This repository, README, CHANGELOG, release notes and the release workflow |
+
+```mermaid
+gantt
+    title Build timeline — 8 Nov 2026 (IST)
+    dateFormat HH:mm
+    axisFormat %H:%M
+    section v1
+    Code + first APK          :done, v1, 12:25, 43m
+    section v2
+    Review of v1              :done, r1, 15:03, 17m
+    Build v2                  :done, v2, 15:20, 14m
+    section v3
+    Build v3                  :done, v3, 15:49, 16m
+    section Repo
+    GitHub repo + docs        :done, gh, 16:57, 18m
+```
+
+> **Total hands-on build time: ~1 h 31 min** (v1 + v2 + v3 + repo). The gaps in between were spent discussing requirements and reviewing each version.
 
 Full details: **[CHANGELOG.md](CHANGELOG.md)**
 
