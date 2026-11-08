@@ -21,11 +21,11 @@ class MainActivity : FlutterActivity() {
         App.currentActivity = WeakReference(this)
     }
 
-    @Deprecated("Needed for the SMS role request result")
+    @Deprecated("Needed for the SMS role request and file picker results")
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        ExtrasBridge.onActivityResult(requestCode)
+        ExtrasBridge.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onDestroy() {

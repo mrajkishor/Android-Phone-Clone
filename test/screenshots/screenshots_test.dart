@@ -345,8 +345,19 @@ void main() {
     await until(() => find.textContaining('Last transfer').evaluate().isNotEmpty);
     await shot('home-01');
     await tapText('Last transfer · sent');
-    await until(() => find.text('Clear list').evaluate().isEmpty && find.byTooltip('Clear list').evaluate().isNotEmpty);
+    await until(() => find.byTooltip('Export (share)').evaluate().isNotEmpty);
+    await shot('home-02-snapshot-summary');
+    await tapText('Files');
     await tapText('Documents');
-    await shot('home-02-last-transfer');
+    await shot('home-03-snapshot-files');
+    await tapText('Extras');
+    await shot('home-04-snapshot-extras');
+    await tester.tap(find.byType(BackButton).first);
+    await until(() => find.byType(BackButton).evaluate().isEmpty);
+    await tester.tap(find
+        .ancestor(of: find.textContaining('napshots'), matching: find.byWidgetPredicate((w) => w is TextButton))
+        .first);
+    await until(() => find.text('Transfer snapshots').evaluate().isNotEmpty);
+    await shot('home-05-snapshots');
   }, skip: Platform.environment['SCREENSHOTS'] == null, timeout: const Timeout(Duration(minutes: 6)));
 }

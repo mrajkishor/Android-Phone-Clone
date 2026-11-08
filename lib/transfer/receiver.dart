@@ -272,6 +272,7 @@ class ReceiverService extends ChangeNotifier {
     await _savePairing();
     notifyListeners();
   }
+
   List<Map> get senderDlq => ((sender['dlq'] as List?) ?? const []).cast<Map>();
 
   // Kept for screens that show a single "current file".
@@ -365,8 +366,7 @@ class ReceiverService extends ChangeNotifier {
   void _updateNotification() {
     if (phase == ReceivePhase.waiting) return;
     if (phase == ReceivePhase.done) {
-      Native.updateNotification(
-          complete ? 'Transfer complete' : 'Transfer finished', '$savedTotal files copied', 100);
+      Native.updateNotification(complete ? 'Transfer complete' : 'Transfer finished', '$savedTotal files copied', 100);
       return;
     }
     final done = sender['bytesDone'] as int? ?? bytesReceived;
@@ -375,7 +375,8 @@ class ReceiverService extends ChangeNotifier {
     if (senderLost) {
       Native.updateNotification('Connection to the old phone lost', 'Open Phone Clone to reconnect', -1);
     } else if (senderPaused) {
-      Native.updateNotification('Transfer paused on the old phone', '${formatBytes(done)} of ${formatBytes(total)}', -1);
+      Native.updateNotification(
+          'Transfer paused on the old phone', '${formatBytes(done)} of ${formatBytes(total)}', -1);
     } else if (senderReconnecting) {
       Native.updateNotification('Reconnecting to the old phone…', 'Keep both phones on the same Wi-Fi', -1);
     } else {
@@ -561,7 +562,10 @@ class ReceiverService extends ChangeNotifier {
             hb['bytesDone'] = _maxBytesDone;
             sender = hb;
           }
-          reply = {'ok': true, if (retryRequested.isNotEmpty) 'retry': [for (final e in retryRequested) e.name]};
+          reply = {
+            'ok': true,
+            if (retryRequested.isNotEmpty) 'retry': [for (final e in retryRequested) e.name]
+          };
         case '/contacts':
           reply = await _importContacts((await _json(req) as List).cast<Map>());
         case '/status':
@@ -981,12 +985,41 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
-  /// Kept for the home screen's "Last transfer" card.
-  Future<void> _saveReport(String outcome) => TransferReport(false, DateTime.now(), outcome, [
-        for (final f in sessionFiles)
-          ReportFile(f.rel, f.size, f.status, category: f.category.name, path: f.path),
+  /// A read-only snapshot of this transfer (Progress, Files and Extras), kept forever
+  /// in Documents/Phone Clone/Snapshots.
+  Future<void> _saveReport(String outcome) async {
+    await TransferReport(
+      false,
+      DateTime.now(),
+      outcome,
+      [
+        for (final f in sessionFiles) ReportFile(f.rel, f.size, f.status, category: f.category.name, path: f.path),
         for (final f in finalFailures) ReportFile('${f['rel']}', 0, 'failed', error: '${f['error']}'),
-      ]).save();
+      ],
+      rows: [
+        for (final c in Category.values)
+          if (tally[c]!.saved + tally[c]!.already + tally[c]!.failed > 0)
+            SummaryRow(c.label, tally[c]!.saved, tally[c]!.already, tally[c]!.failed),
+        if (contactsAdded + contactsExisting + contactsFailed > 0)
+          SummaryRow('Contacts', contactsAdded, contactsExisting, contactsFailed),
+        for (final e in Extra.values)
+          if (extraTally[e]!.state != 'pending')
+            SummaryRow(e.label, extraTally[e]!.added, extraTally[e]!.existing, extraTally[e]!.failed),
+      ],
+      lines: [
+        '$savedTotal files copied, $alreadyTotal already here, ${finalFailures.length} failed.',
+        if (clonedFiles > 0)
+          '$clonedFiles identical ${clonedFiles == 1 ? 'file' : 'files'} copied here instead of sent (${formatBytes(clonedBytes)} saved).',
+        if (whatsappBackup) 'A WhatsApp backup was copied: WhatsApp offers to restore it during setup.',
+      ],
+      extras: {
+        for (final e in Extra.values)
+          if (extraTally[e]!.state != 'pending') e.name: extraTally[e]!.toJson(),
+      },
+      apps: [for (final a in apps) SnapshotApp(a.label, a.package, a.state, a.versionName)],
+      appVersion: kAppVersion,
+    ).save();
+  }
 
   void _noteFile(String rel, String path, int size, String status, Category category) {
     _pathByRel[rel] = path;
@@ -1142,8 +1175,12 @@ class ReceiverService extends ChangeNotifier {
         missing++;
         continue;
       }
-      final app = ReceivedApp(a['package'] as String, a['label'] as String? ?? a['package'] as String,
-          a['versionName'] as String?, (a['versionCode'] as num? ?? 0).toInt(), a['fromPlay'] == true,
+      final app = ReceivedApp(
+          a['package'] as String,
+          a['label'] as String? ?? a['package'] as String,
+          a['versionName'] as String?,
+          (a['versionCode'] as num? ?? 0).toInt(),
+          a['fromPlay'] == true,
           paths.cast<String>());
       try {
         final v = await NativeExtras.installedVersion(app.package);
@@ -1180,7 +1217,8 @@ class ReceiverService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _receiveWallpaper(HttpRequest req) async {
     final which = req.uri.queryParameters['which'] == 'lock' ? 'lock' : 'home';
-    final bytes = await req.fold<BytesBuilder>(BytesBuilder(copy: false), (b, d) => b..add(d)).then((b) => b.takeBytes());
+    final bytes =
+        await req.fold<BytesBuilder>(BytesBuilder(copy: false), (b, d) => b..add(d)).then((b) => b.takeBytes());
     final t = extraTally[Extra.wallpaper]!
       ..state = 'running'
       ..total += 1;

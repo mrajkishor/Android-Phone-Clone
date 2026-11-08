@@ -4,14 +4,14 @@
 
 ### Move *everything* from your old Android phone to your new one — over Wi-Fi, fast, verified, without duplicates.
 
-[![Release](https://img.shields.io/badge/release-v5.5.1-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.5.1)
+[![Release](https://img.shields.io/badge/release-v5.6.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.6.0)
 [![Standard edition](https://img.shields.io/badge/standard%20permissions-v4.2.2-blue?style=for-the-badge)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Tests](https://img.shields.io/badge/tests-16%20passing-brightgreen?style=for-the-badge)](#-testing)
 [![No cloud](https://img.shields.io/badge/cloud-none-lightgrey?style=for-the-badge)](#-privacy--safety)
 
-**[⬇️ Download the APK (v5.5.1)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.5.1)** ·
+**[⬇️ Download the APK (v5.6.0)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.6.0)** ·
 [Quick start](#-quick-start) ·
 [Features](#-features) ·
 [How it works](#-how-it-works) ·
@@ -21,7 +21,7 @@
 </div>
 
 > [!TIP]
-> **Latest release: Phone Clone 5.5.1** → [`apk/PhoneClone-v5.5.1.apk`](apk/PhoneClone-v5.5.1.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and the home screen keeps a **Last transfer** summary. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs.
+> **Latest release: Phone Clone 5.6.0** → [`apk/PhoneClone-v5.6.0.apk`](apk/PhoneClone-v5.6.0.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and every transfer leaves a **snapshot** of all three tabs that you keep, export and import. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs.
 
 > [!WARNING]
 > **Some v5 Extras need restricted access.** Messages and call history use permissions that Google restricts, so **Play Protect may block the install from WhatsApp or a browser**. Install it over USB (`adb install`) or turn off Play Protect scanning while installing. Google Play allows them only after a manual review. See [Extras that need restricted access](#-v5-extras-that-need-restricted-access). Prefer standard permissions only? Use **[v4.2.2](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)** ([`apk/PhoneClone-v4.2.2.apk`](apk/PhoneClone-v4.2.2.apk)).
@@ -63,7 +63,7 @@ Every feature, screen by screen, with the version that added it. *These are the 
 
 ### 🏠 Home and pairing
 
-| **Home** · v1<br>*Last transfer* card v5.3 · version in footer v5.3 | **New phone: QR code** · v1<br>address & code to type v4.2 | **Old phone: connect** · v1<br>*Continue previous transfer* v4 |
+| **Home** · v1<br>snapshot card, *All snapshots* & *Import* v5.6 · version in footer v5.3 | **New phone: QR code** · v1<br>address & code to type v4.2 | **Old phone: connect** · v1<br>*Continue previous transfer* v4 |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/home-01.png" width="240" alt="Home screen"> | <img src="docs/screenshots/new-01-qr.png" width="240" alt="New phone QR code"> | <img src="docs/screenshots/old-01-connect.png" width="240" alt="Old phone connect"> |
 
@@ -101,11 +101,15 @@ Every feature, screen by screen, with the version that added it. *These are the 
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/old-09-extras.png" width="240" alt="Old phone extras"> | <img src="docs/screenshots/new-05-extras.png" width="240" alt="New phone extras"> | <img src="docs/screenshots/new-06-extras-apps.png" width="240" alt="Apps and WhatsApp"> |
 
-### 🕘 Last transfer *(home screen)*
+### 🗃️ Transfer snapshots *(home screen, kept forever)*
 
-| **Every file of the last transfer, even after disconnecting** · v5.3<br>Open & Show in Files app v5.5 |
+| **Snapshot: Progress** · v5.6<br>outcome, totals, per-type table | **Snapshot: Files** · v5.6<br>same grouped view, Open & Show in Files app | **Snapshot: Extras** · v5.6 |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/home-02-snapshot-summary.png" width="240" alt="Snapshot summary"> | <img src="docs/screenshots/home-03-snapshot-files.png" width="240" alt="Snapshot files"> | <img src="docs/screenshots/home-04-snapshot-extras.png" width="240" alt="Snapshot extras"> |
+
+| **All snapshots + Import** · v5.6<br>stored in *Documents › Phone Clone › Snapshots* |
 |:---:|
-| <img src="docs/screenshots/home-02-last-transfer.png" width="240" alt="Last transfer"> |
+| <img src="docs/screenshots/home-05-snapshots.png" width="240" alt="All snapshots"> |
 
 <sub>Regenerate with `SCREENSHOTS=1 flutter test test/screenshots/screenshots_test.dart`.</sub>
 
@@ -361,7 +365,7 @@ v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), 
 - Folders Android doesn't let any app read (`Android/data`, `Android/obb`) are listed as **Restricted** instead of being silently skipped.
 - WhatsApp: its own **Transfer chats** is recommended.
 - Every file has **Open** and **Show in Files app** buttons.
-- **Last transfer** on the home screen of both phones: tap it to see every file, grouped, even after the phones are disconnected.
+- **Transfer snapshots** on both phones: every transfer is kept as a read-only snapshot of its Progress, Files and Extras tabs in *Internal storage › Documents › Phone Clone › Snapshots*, so the record stays after the old phone is gone (even if the app is uninstalled). **Export** shares it (Drive, WhatsApp, email); **Import** opens one shared from the other phone.
 
 
 
@@ -615,7 +619,8 @@ Contacts use their own check: phone numbers (last 10 digits), email addresses, o
 
 - 🏠 **Local only.** Data travels directly between the two phones over your Wi-Fi or hotspot. There's no cloud, account or internet connection involved.
 - 🔑 **Paired.** Every request needs the 6-digit code shown on the new phone.
-- 👀 **The old phone is read-only.** The sending code only reads files. It contains no write, move or delete operations on the old phone, and the tests verify the old side is byte-for-byte unchanged.
+- 👀 **Your files on the old phone are read-only.** The sending code only reads them, and the tests verify they are byte-for-byte unchanged. The only thing Phone Clone writes there is its own transfer snapshot in *Documents › Phone Clone › Snapshots*.
+- 🗃️ **Snapshots** list file names, folders, sizes and counts. They hold no file contents, message texts or contact details, and leave the phone only if you share them.
 - ⚠️ Traffic is plain HTTP inside your local network. Use a network you trust, such as your home Wi-Fi or the new phone's own hotspot.
 
 ---
@@ -748,7 +753,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| [**v5.5.1**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.5.1) · *latest release* | Polish | Files copied before a pause no longer counted as "already there"; tidier labels; README screenshots | **~40 min** |
+| [**v5.6.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.6.0) · *latest release* | Snapshots | Every transfer kept as a read-only **snapshot** of Progress, Files and Extras in *Documents › Phone Clone › Snapshots*; export & import; *Show in Files app* opens the exact folder | **~45 min** |
+| v5.5.1 | Polish | Files copied before a pause no longer counted as "already there"; tidier labels; README screenshots | **~40 min** |
 | v5.5.0 | Actions | Every file has **Open** and **Show in Files app** buttons; status badge on the thumbnail | **~15 min** |
 | v5.4.1 | Fix | Both phones always show the same Extras numbers (installed apps, ringtones, wallpaper) | **~20 min** |
 | v5.4.0 | Open | Tap a file to open it in the phone's own app; open folders in the Files app | **~15 min** |

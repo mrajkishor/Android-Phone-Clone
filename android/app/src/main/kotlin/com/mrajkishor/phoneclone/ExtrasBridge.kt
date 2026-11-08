@@ -40,11 +40,19 @@ import java.util.concurrent.TimeUnit
 class ExtrasBridge(private val ctx: Context) {
     companion object {
         const val REQ_SMS_ROLE = 7301
+        const val REQ_PICK = 7302
         private var pendingRole: ((Boolean) -> Unit)? = null
+        private var pendingPick: ((Uri?) -> Unit)? = null
         val installCallbacks = HashMap<Int, (Boolean, String?) -> Unit>()
 
         /** Called by MainActivity.onActivityResult. */
-        fun onActivityResult(requestCode: Int) {
+        fun onActivityResult(requestCode: Int, resultCode: Int = 0, data: Intent? = null) {
+            if (requestCode == REQ_PICK) {
+                val cb = pendingPick
+                pendingPick = null
+                cb?.invoke(if (resultCode == Activity.RESULT_OK) data?.data else null)
+                return
+            }
             if (requestCode == REQ_SMS_ROLE) {
                 val cb = pendingRole
                 pendingRole = null
@@ -142,6 +150,8 @@ class ExtrasBridge(private val ctx: Context) {
 
             // ---------------- open in the phone's own apps ----------------
             "openFile" -> result.success(openFile(call.argument<String>("path")!!))
+            "shareFile" -> result.success(shareFile(call.argument<String>("path")!!, call.argument<String>("title")))
+            "pickFile" -> pickFile(result)
             "openFilesApp" -> result.success(openFilesApp(call.argument<String>("folder"), call.argument<String>("dir")))
 
             // ---------------- thumbnails for the Files tab ----------------
@@ -678,11 +688,25 @@ class ExtrasBridge(private val ctx: Context) {
             folder != null -> "primary:$folder"
             else -> null
         }
+        // Samsung's My Files opens at a folder given as a plain path.
+        val absolute = dir ?: folder?.let { android.os.Environment.getExternalStorageDirectory().absolutePath + "/" + it }
+        if (absolute != null) {
+            val samsung = Intent("samsung.myfiles.intent.action.LAUNCH_MY_FILES")
+                .setPackage("com.sec.android.app.myfiles")
+                .putExtra("samsung.myfiles.intent.extra.START_PATH", absolute)
+            if (startOrFalse(samsung)) return true
+        }
         if (docId != null && Build.VERSION.SDK_INT >= 26) {
             val doc = android.provider.DocumentsContract.buildDocumentUri(authority, docId)
-            val atFolder = Intent(Intent.ACTION_VIEW).setDataAndType(doc, "vnd.android.document/directory")
+            fun atFolder() = Intent(Intent.ACTION_VIEW).setDataAndType(doc, "vnd.android.document/directory")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            if (startOrFalse(atFolder)) return true
+            // Android's own Files app (DocumentsUI) honours the folder; other file managers
+            // (e.g. Files by Google, the default on Moto/Pixel) open at their home screen,
+            // so ask DocumentsUI first, by name.
+            for (pkg in listOf("com.google.android.documentsui", "com.android.documentsui")) {
+                if (startOrFalse(atFolder().setPackage(pkg))) return true
+            }
+            if (startOrFalse(atFolder())) return true
         }
         val root = android.provider.DocumentsContract.buildRootUri(authority, "primary")
         if (startOrFalse(Intent(Intent.ACTION_VIEW).setDataAndType(root, "vnd.android.document/root"))) return true
@@ -692,6 +716,46 @@ class ExtrasBridge(private val ctx: Context) {
             if (startOrFalse(launch)) return true
         }
         return startOrFalse(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
+    }
+
+    /** Android's share sheet for one file (save to Drive, send by WhatsApp or email, …). */
+    private fun shareFile(path: String, title: String?): Boolean {
+        val uri = try {
+            androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", File(path))
+        } catch (_: Exception) { return false }
+        val send = Intent(Intent.ACTION_SEND).setType("application/json")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, title ?: File(path).name)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        return startOrFalse(Intent.createChooser(send, title).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    }
+
+    /** Lets the user pick any file; returns {name, bytes} or null if cancelled. */
+    private fun pickFile(result: MethodChannel.Result) {
+        val a = activity() ?: run { result.success(null); return }
+        pendingPick = { uri ->
+            if (uri == null) {
+                result.success(null)
+            } else {
+                Thread {
+                    try {
+                        val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                        val name = ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                        main.post { result.success(mapOf("name" to name, "bytes" to bytes)) }
+                    } catch (e: Exception) {
+                        main.post { result.error("PICK_FAILED", e.message, null) }
+                    }
+                }.start()
+            }
+        }
+        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+        try {
+            a.startActivityForResult(pick, REQ_PICK)
+        } catch (e: Exception) {
+            pendingPick = null
+            result.success(null)
+        }
     }
 
     // ======================= thumbnails =======================

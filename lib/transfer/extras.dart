@@ -61,6 +61,14 @@ class ExtraTally {
   Map<String, dynamic> toJson() =>
       {'total': total, 'added': added, 'existing': existing, 'failed': failed, 'state': state, 'note': note};
 
+  static ExtraTally fromJson(Map m) => ExtraTally()
+    ..total = (m['total'] as num? ?? 0).toInt()
+    ..added = (m['added'] as num? ?? 0).toInt()
+    ..existing = (m['existing'] as num? ?? 0).toInt()
+    ..failed = (m['failed'] as num? ?? 0).toInt()
+    ..state = m['state'] as String? ?? 'done'
+    ..note = m['note'] as String?;
+
   void absorb(Map result) {
     added += (result['added'] as num? ?? 0).toInt();
     existing += (result['existing'] as num? ?? 0).toInt();

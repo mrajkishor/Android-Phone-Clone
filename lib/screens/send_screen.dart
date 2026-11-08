@@ -51,7 +51,10 @@ class _SendBodyState extends State<_SendBody> {
 
   ScanResult? _scan;
   List<Contact> _contacts = [];
-  final Set<Category> _selected = {for (final c in Category.values) if (c.onByDefault) c};
+  final Set<Category> _selected = {
+    for (final c in Category.values)
+      if (c.onByDefault) c
+  };
   bool _sendContacts = true;
   ExtrasScan? _extras;
   final Set<Extra> _selectedExtras = {};
@@ -89,8 +92,7 @@ class _SendBodyState extends State<_SendBody> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('The new phone isn’t at ${last.pairing.host} any more. Scan the QR code it shows now.'),
       ));
-      final pairing =
-          await Navigator.push<PairingInfo>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
+      final pairing = await Navigator.push<PairingInfo>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
       if (pairing == null) {
         setState(() => _error = 'Couldn’t reach the new phone at ${last.pairing.host}. '
             'On the new phone, tap “Show QR” and scan it from here.');
@@ -135,7 +137,10 @@ class _SendBodyState extends State<_SendBody> {
       _extras = await ExtrasScan.scan(await Native.storageRoots());
       _selectedExtras
         ..clear()
-        ..addAll([for (final e in Extra.values) if (_extras!.count(e) > 0) e]);
+        ..addAll([
+          for (final e in Extra.values)
+            if (_extras!.count(e) > 0) e
+        ]);
     } catch (e) {
       setState(() {
         _step = _Step.connect;
@@ -197,19 +202,39 @@ class _SendBodyState extends State<_SendBody> {
     }
   }
 
-  /// Kept for the home screen's "Last transfer" card.
-  Future<void> _saveReport(SenderService s) => TransferReport(
-        true,
-        DateTime.now(),
-        switch (s.phase) { SendPhase.done => 'done', SendPhase.cancelled => 'stopped', _ => 'interrupted' },
-        [
-          for (final o in s.outcomes.values)
-            ReportFile(o.file.rel, o.file.size, o.status,
-                category: o.file.category.name, path: o.file.path, error: o.error),
-          for (final x in _scan?.restricted ?? const <RestrictedItem>[])
-            ReportFile(x.rel, 0, 'restricted', error: x.reason),
-        ],
-      ).save();
+  /// A read-only snapshot of this transfer (Progress, Files and Extras), kept forever
+  /// in Documents/Phone Clone/Snapshots.
+  Future<void> _saveReport(SenderService s) async {
+    await TransferReport(
+      true,
+      DateTime.now(),
+      switch (s.phase) { SendPhase.done => 'done', SendPhase.cancelled => 'stopped', _ => 'interrupted' },
+      [
+        for (final o in s.outcomes.values)
+          ReportFile(o.file.rel, o.file.size, o.status,
+              category: o.file.category.name, path: o.file.path, error: o.error),
+        for (final x in _scan?.restricted ?? const <RestrictedItem>[])
+          ReportFile(x.rel, 0, 'restricted', error: x.reason),
+      ],
+      rows: [
+        for (final c in Category.values)
+          if (s.tally[c]!.selected > 0) SummaryRow(c.label, s.tally[c]!.sent, s.tally[c]!.already, s.tally[c]!.failed),
+        if (s.contactsTotal > 0) SummaryRow('Contacts', s.contactsAdded, s.contactsExisting, s.contactsFailed),
+        for (final e in Extra.values)
+          if (s.selectedExtras.contains(e))
+            SummaryRow(e.label, s.extraTally[e]!.added, s.extraTally[e]!.existing, s.extraTally[e]!.failed),
+      ],
+      lines: [
+        '${s.filesSent} files copied, ${s.filesAlready} already on the new phone, ${s.failedItems.length} failed.',
+        if (s.clonedFiles > 0)
+          '${s.clonedFiles} identical ${s.clonedFiles == 1 ? 'file' : 'files'} copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent).',
+        if (s.resumedBytes > 0) '${formatBytes(s.resumedBytes)} continued instead of re-sent.',
+        if (s.fatalError != null) s.fatalError!,
+      ],
+      extras: {for (final e in s.selectedExtras) e.name: s.extraTally[e]!.toJson()},
+      appVersion: kAppVersion,
+    ).save();
+  }
 
   Future<void> _confirmStop() async {
     final ok = await showDialog<bool>(
@@ -346,13 +371,13 @@ class _SendBodyState extends State<_SendBody> {
                 subtitle: Text('${scan.count(c)} files • ${formatBytes(scan.bytes(c))}\n${c.description}'),
                 isThreeLine: true,
                 value: scan.count(c) > 0 && _selected.contains(c),
-                onChanged: scan.count(c) == 0
-                    ? null
-                    : (v) => setState(() => v ? _selected.add(c) : _selected.remove(c)),
+                onChanged:
+                    scan.count(c) == 0 ? null : (v) => setState(() => v ? _selected.add(c) : _selected.remove(c)),
               ),
             SwitchListTile(
               title: const Text('Contacts'),
-              subtitle: Text('${_contacts.length} contacts\nWith photos. Contacts already on the new phone are skipped.'),
+              subtitle:
+                  Text('${_contacts.length} contacts\nWith photos. Contacts already on the new phone are skipped.'),
               isThreeLine: true,
               value: _contacts.isNotEmpty && _sendContacts,
               onChanged: _contacts.isEmpty ? null : (v) => setState(() => _sendContacts = v),
@@ -429,11 +454,13 @@ class _SendBodyState extends State<_SendBody> {
     final s = _sender!;
     final progress = _busy || s.phase == SendPhase.idle ? _buildRunning() : _buildResult();
     final rows = [
-      for (final o in s.outcomes.values) FileRow(o.file.rel, o.file.size, o.status, error: o.error, category: o.file.category, path: o.file.path),
+      for (final o in s.outcomes.values)
+        FileRow(o.file.rel, o.file.size, o.status, error: o.error, category: o.file.category, path: o.file.path),
       for (final x in _scan?.restricted ?? const <RestrictedItem>[]) FileRow(x.rel, 0, 'restricted', error: x.reason),
     ];
     final failed = rows.where((r) => r.status == 'failed').length;
-    final waitingExtra = s.extraTally.entries.any((e) => s.selectedExtras.contains(e.key) && e.value.state == 'waiting');
+    final waitingExtra =
+        s.extraTally.entries.any((e) => s.selectedExtras.contains(e.key) && e.value.state == 'waiting');
     return TransferTabs(
       progress: progress,
       files: FileCompareList(
@@ -442,7 +469,10 @@ class _SendBodyState extends State<_SendBody> {
       ),
       extras: ExtrasStatusList(
         tally: s.extraTally,
-        shown: [for (final e in Extra.values) if (s.selectedExtras.contains(e)) e],
+        shown: [
+          for (final e in Extra.values)
+            if (s.selectedExtras.contains(e)) e
+        ],
         onRetry: s.canSendExtras ? s.retryExtra : null,
         retryHint: 'Update the new phone to Phone Clone 5 or later, then start the transfer again.',
       ),
@@ -452,8 +482,7 @@ class _SendBodyState extends State<_SendBody> {
   }
 
   List<QueueEntry> _queueEntries(SenderService s) => [
-        for (final d in s.dlq)
-          QueueEntry(d.file.rel, d.lastError, d.attempts, s.maxAttempts, d.status.name),
+        for (final d in s.dlq) QueueEntry(d.file.rel, d.lastError, d.attempts, s.maxAttempts, d.status.name),
       ];
 
   Widget _buildRunning() {
@@ -473,11 +502,13 @@ class _SendBodyState extends State<_SendBody> {
             const SizedBox(height: 20),
             LinearProgressIndicator(value: value, minHeight: 10, borderRadius: BorderRadius.circular(5)),
             const SizedBox(height: 10),
-            Text('${s.dupCheckDoneFiles} of ${s.dupCheckTotalFiles} files • '
+            Text(
+                '${s.dupCheckDoneFiles} of ${s.dupCheckTotalFiles} files • '
                 '${formatBytes(s.dupCheckDoneBytes)} of ${formatBytes(s.dupCheckTotalBytes)}',
                 textAlign: TextAlign.center),
             if (s.statusLine != null)
-              Text(s.statusLine!, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall, textAlign: TextAlign.center),
+              Text(s.statusLine!,
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall, textAlign: TextAlign.center),
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: s.skipDuplicateCheck,
@@ -515,9 +546,7 @@ class _SendBodyState extends State<_SendBody> {
                     icon: Icons.replay,
                     color: Colors.orange,
                     title: 'Retrying failed files — round ${s.retryRound} of ${s.retryRounds}',
-                    subtitle: s.nextRetryIn == null
-                        ? 'Retrying now'
-                        : 'Next try in ${s.nextRetryIn!.inSeconds + 1} s',
+                    subtitle: s.nextRetryIn == null ? 'Retrying now' : 'Next try in ${s.nextRetryIn!.inSeconds + 1} s',
                   )
                 : const StatusBanner(
                     icon: Icons.upload_rounded,
@@ -540,7 +569,7 @@ class _SendBodyState extends State<_SendBody> {
             extraLines: [
               if (s.filesAlready > 0) '${s.filesAlready} already on the new phone — skipped',
               if (s.clonedFiles > 0)
-                '${s.clonedFiles} identical files copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent)',
+                '${s.clonedFiles} identical ${s.clonedFiles == 1 ? 'file' : 'files'} copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent)',
               if (s.resumedBytes > 0) '${formatBytes(s.resumedBytes)} resumed, not re-sent',
               if (s.contactsTotal > 0) 'Contacts: ${s.contactsAdded} added, ${s.contactsExisting} already there',
               if (s.statusLine != null) s.statusLine!,
@@ -567,7 +596,8 @@ class _SendBodyState extends State<_SendBody> {
               bytes: l.bytes,
               total: l.total,
               resumedFrom: l.resumedFrom,
-              note: l.batch ? 'Batch of ${l.batchCount} small files • file ${l.batchIndex + 1} of ${l.batchCount}' : null,
+              note:
+                  l.batch ? 'Batch of ${l.batchCount} small files • file ${l.batchIndex + 1} of ${l.batchCount}' : null,
             ),
           const SizedBox(height: 8),
           RecentFilesList(items: [for (final r in s.recent) (r.rel, r.size, r.alreadyThere)]),
@@ -661,7 +691,8 @@ class _SendBodyState extends State<_SendBody> {
           title: const Text('Speed-ups'),
           subtitle: Text([
             if (s.batchesSent > 0) '${s.batchesSent} batches of small files',
-            if (s.clonedFiles > 0) '${s.clonedFiles} identical files copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent)',
+            if (s.clonedFiles > 0)
+              '${s.clonedFiles} identical ${s.clonedFiles == 1 ? 'file' : 'files'} copied on the new phone (${formatBytes(s.clonedBytes)} not re-sent)',
             if (s.resumedBytes > 0) '${formatBytes(s.resumedBytes)} continued instead of re-sent',
           ].join('\n')),
         ),
@@ -673,8 +704,9 @@ class _SendBodyState extends State<_SendBody> {
         ),
       const ListTile(
         leading: Icon(Icons.lock_outline),
-        title: Text('Nothing on this phone was changed'),
-        subtitle: Text('Files were only read, never moved or deleted.'),
+        title: Text('Your files on this phone weren’t changed'),
+        subtitle: Text('Files were only read, never moved or deleted. Phone Clone only adds its snapshot '
+            'of this transfer in Documents › Phone Clone › Snapshots.'),
       ),
       const SizedBox(height: 16),
       if (!allGood)

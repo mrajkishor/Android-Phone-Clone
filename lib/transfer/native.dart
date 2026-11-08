@@ -122,6 +122,17 @@ class NativeExtras {
   static Future<bool> openFilesApp([String? folder]) async =>
       await _c.invokeMethod<bool>('openFilesApp', {'folder': folder}) ?? false;
 
+  /// Android's share sheet for a file (save to Drive, send by email, …).
+  static Future<bool> shareFile(String path, {String? title}) async =>
+      await _c.invokeMethod<bool>('shareFile', {'path': path, 'title': title}) ?? false;
+
+  /// Lets the user pick a file. Returns its name and bytes, or null if cancelled.
+  static Future<(String?, Uint8List)?> pickFile() async {
+    final r = await _c.invokeMethod<Map>('pickFile');
+    if (r == null) return null;
+    return (r['name'] as String?, r['bytes'] as Uint8List);
+  }
+
   /// Opens the phone's Files app in the folder that holds [path] (an absolute file path).
   static Future<bool> showInFilesApp(String path) async {
     final i = path.lastIndexOf('/');

@@ -3,10 +3,11 @@
 All notable changes to **Android Phone Clone (Phone Transfer)** are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-> **Latest release: 5.5.1.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
+> **Latest release: 5.6.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.6.0](#560--2026-11-09) | Transfer snapshots: all 3 tabs kept forever, export & import; Show in Files app fixed | 5 | ✅ | ~45 min |
 | [5.5.1](#551--2026-11-09) | Counts after a pause; tidier labels; README screenshots | 5 | ✅ | ~40 min |
 | [5.5.0](#550--2026-11-09) | Preview: every file has Open and Show in Files app buttons | 5 | ✅ | ~15 min |
 | [5.4.1](#541--2026-11-09) | Preview fix: both phones always show the same Extras numbers | 5 | ✅ | ~20 min |
@@ -24,7 +25,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [5.5.1] — 2026-11-09 *(latest release)*
+## [5.6.0] — 2026-11-09 *(latest release)*
+
+### Added
+- **Transfer snapshots.** Every transfer leaves a read-only snapshot of **all three tabs**: Progress (outcome, totals, the per-type table, failures), Files and Extras. It's what you'd see if the phones were still connected, so the new phone keeps a full record after the old phone is gone.
+  - Stored as a file in **Internal storage › Documents › Phone Clone › Snapshots** (`Phone Clone - Sent 2026-11-09 01.34.05.json`). Shared storage keeps it even if Phone Clone is uninstalled. It's never changed after it's written.
+  - **Export:** the share button sends the snapshot anywhere: Drive, WhatsApp, email, Files.
+  - **Import:** pick a snapshot file, for example one exported on the other phone. It's copied into the Snapshots folder and opened. Importing the same one twice keeps one copy. Files that aren't snapshots are refused with a message.
+  - **Home screen:** the newest snapshot as a card, with *All snapshots* and *Import*. With no snapshots yet, there's an *Import a transfer snapshot* button.
+  - The Snapshots folder isn't included when the old phone is scanned for files.
+- Snapshots from 5.3–5.5 (the old *Last transfer* list) still show.
+
+### Fixed
+- **"Show in Files app" didn't open the file's folder** on many phones. On Moto and Pixel phones, the default Files by Google opens at its own home screen. Phone Clone now asks Android's own Files app first, which opens the exact parent folder. Samsung's My Files is opened at the folder directly. Only if neither exists does it fall back to the default Files app.
+
+### Changed
+- Wording: "Your files on this phone weren't changed". Phone Clone now adds its own snapshot file, but never changes your files.
+
+## [5.5.1] — 2026-11-09
 
 ### Fixed
 - **After Pause and Resume, files copied before the pause were counted as "already there"** on both phones. A batch that was interrupted is sent again, and the new phone now recognises files it saved earlier in the same transfer: they count as copied, once.

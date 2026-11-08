@@ -118,6 +118,7 @@ ScanResult _scan(List<String> roots, List<({String path, String kind})> media) {
           continue;
         }
         if (name == '.phonetransfer_tmp') continue;
+        if (rel == 'Documents/Phone Clone/Snapshots') continue; // this phone's own transfer snapshots
         walk(e, root, hidden || name.startsWith('.'));
       } else if (e is File) {
         if (mediaPaths.contains(e.path)) continue;

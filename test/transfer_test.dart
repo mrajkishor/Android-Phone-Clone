@@ -30,6 +30,7 @@ Map<String, (String, int)> snapshot(Directory root, {bool skipTmp = true}) {
     if (e is! File) continue;
     final rel = p.relative(e.path, from: root.path);
     if (skipTmp && rel.startsWith('.phonetransfer_tmp')) continue;
+    if (rel.startsWith('Documents/Phone Clone/')) continue; // transfer snapshots
     out[rel] = (sha256.convert(e.readAsBytesSync()).toString(), e.lastModifiedSync().millisecondsSinceEpoch);
   }
   return out;
@@ -617,6 +618,22 @@ void main() {
     expect(report!.sent, isFalse);
     expect(report.files, hasLength(plan.files.length));
     expect(report.onNewPhone, plan.files.length);
+    // It's a full snapshot (Progress, Files, Extras) in Documents/Phone Clone/Snapshots.
+    expect(report.path, contains('Documents/Phone Clone/Snapshots/Phone Clone - Received '));
+    expect(report.rows.map((x) => x.label), contains('Call history'));
+    expect(report.extras[Extra.calls.name]!['added'], 2);
+    expect(report.apps.single.package, 'com.example.x');
+    // Export / import: the same snapshot imported again is kept once; other files are refused.
+    final bytes = File(report.path!).readAsBytesSync();
+    final again = await TransferReport.import(bytes);
+    expect(again!.path, report.path);
+    expect(await TransferReport.import('{"hello": 1}'.codeUnits), isNull);
+    expect((await TransferReport.all()).where((x) => !x.sent), hasLength(1));
+    // Shared from another phone: imported as a new file, never overwriting one that's here.
+    File(report.path!).deleteSync();
+    final imported = await TransferReport.import(bytes);
+    expect(imported, isNotNull);
+    expect(File(imported!.path!).readAsBytesSync().length, bytes.length);
 
     // Again: nothing new; the Files tab shows "already there".
     await s.run(plan);

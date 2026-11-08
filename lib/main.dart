@@ -33,6 +33,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   TransferReport? _report;
+  int _count = 0;
 
   @override
   void initState() {
@@ -41,8 +42,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _reload() async {
-    final r = await TransferReport.load();
-    if (mounted) setState(() => _report = r);
+    final all = await TransferReport.all();
+    if (mounted) {
+      setState(() {
+        _report = all.isEmpty ? null : all.first;
+        _count = all.length;
+      });
+    }
   }
 
   /// Opens a screen and refreshes the "Last transfer" card when coming back.
@@ -89,12 +95,33 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (_report != null) ...[
                       const SizedBox(height: 24),
-                      LastTransferCard(report: _report!, onOpen: () => _open(ReportScreen(report: _report!))),
+                      LastTransferCard(
+                        report: _report!,
+                        count: _count,
+                        onOpen: () => _open(SnapshotScreen(report: _report!)),
+                        onAll: () => _open(const SnapshotsScreen()),
+                        onImport: () async {
+                          await importSnapshot(context);
+                          await _reload();
+                        },
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () async {
+                            await importSnapshot(context);
+                            await _reload();
+                          },
+                          icon: const Icon(Icons.file_open_outlined, size: 18),
+                          label: const Text('Import a transfer snapshot'),
+                        ),
+                      ),
                     ],
                     const Spacer(),
                     Text(
                       'Copies photos, videos, music, documents, every other file and contacts, '
-                      'checksum-verified and without duplicates. Nothing on the old phone is changed, '
+                      'checksum-verified and without duplicates. Your files on the old phone are never changed, '
                       'and nothing leaves your local network.  •  v$kAppVersion',
                       textAlign: TextAlign.center,
                       style: t.bodySmall,

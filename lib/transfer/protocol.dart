@@ -14,7 +14,7 @@ const int kDefaultPort = 8765;
 const int kProtocolVersion = 5;
 
 /// Shown in the app. Must match `version:` in pubspec.yaml (a test checks it).
-const String kAppVersion = '5.5.1';
+const String kAppVersion = '5.6.0';
 
 /// Oldest protocol this app can still talk to.
 const int kMinProtocolVersion = 3;
