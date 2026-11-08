@@ -22,10 +22,10 @@ extension ExtraInfo on Extra {
   /// What the user is asked on the NEW phone before this can be restored.
   String get newPhonePrompt => switch (this) {
         Extra.messages =>
-          'To restore your messages, Phone Clone must briefly be your default SMS app. You will be asked to switch back afterwards.',
-        Extra.calls => 'Allow Phone Clone to add your call history.',
-        Extra.calendar => 'Allow Phone Clone to add your calendar events.',
-        Extra.ringtones => 'Allow Phone Clone to set your ringtone, notification and alarm sounds ("Modify system settings").',
+          'To restore your messages, PhoneHop must briefly be your default SMS app. You will be asked to switch back afterwards.',
+        Extra.calls => 'Allow PhoneHop to add your call history.',
+        Extra.calendar => 'Allow PhoneHop to add your calendar events.',
+        Extra.ringtones => 'Allow PhoneHop to set your ringtone, notification and alarm sounds ("Modify system settings").',
         Extra.apps || Extra.wallpaper => '',
       };
 
@@ -34,7 +34,7 @@ extension ExtraInfo on Extra {
   String? get restriction => switch (this) {
         Extra.messages => 'Restricted by Google: SMS access. Play Protect can block this app when it is '
             'installed from WhatsApp or a browser, and Google Play allows it only after a manual review '
-            '("Backup and restore" exception). Android also makes Phone Clone the default SMS app for a moment.',
+            '("Backup and restore" exception). Android also makes PhoneHop the default SMS app for a moment.',
         Extra.calls => 'Restricted by Google: call-log access. Google Play allows it only after a manual review '
             '("Backup and restore" exception).',
         Extra.apps => 'Sensitive: installing apps needs your OK for each one, and a Play declaration '

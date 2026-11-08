@@ -209,7 +209,7 @@ class ExtrasBridge(private val ctx: Context) {
     private fun smsKey(address: String?, date: Long, body: String?) = "$address|$date|${(body ?: "").hashCode()}"
 
     private fun writeSms(items: List<Map<String, Any?>>): Map<String, Int> {
-        if (!isDefaultSms()) throw IllegalStateException("Phone Clone is not the default SMS app")
+        if (!isDefaultSms()) throw IllegalStateException("PhoneHop is not the default SMS app")
         val seen = smsSeen ?: HashSet<String>().also { set ->
             ctx.contentResolver.query(Telephony.Sms.CONTENT_URI, arrayOf("address", "date", "body"), null, null, null)?.use { c ->
                 while (c.moveToNext()) set.add(smsKey(c.getString(0), c.getLong(1), c.getString(2)))
@@ -285,7 +285,7 @@ class ExtrasBridge(private val ctx: Context) {
     private fun mmsKey(date: Long, box: Int, addresses: String) = "$date|$box|$addresses"
 
     private fun writeMms(items: List<Map<String, Any?>>): Map<String, Int> {
-        if (!isDefaultSms()) throw IllegalStateException("Phone Clone is not the default SMS app")
+        if (!isDefaultSms()) throw IllegalStateException("PhoneHop is not the default SMS app")
         val seen = mmsSeen ?: HashSet<String>().also { set ->
             ctx.contentResolver.query(Telephony.Mms.CONTENT_URI, arrayOf("_id", "date", "msg_box"), null, null, null)?.use { c ->
                 while (c.moveToNext()) {

@@ -1,10 +1,12 @@
-# Privacy Policy — Phone Clone
+# Privacy Policy — PhoneHop
+
+*PhoneHop was called Phone Clone before version 5.7.0.*
 
 **Effective date:** 8 November 2026 (updated for version 5.0.0)
-**App:** Phone Clone (Android), package `com.mrajkishor.phoneclone`
+**App:** PhoneHop (Android), package `com.mrajkishor.phoneclone`
 **Developer:** [@mrajkishor](https://github.com/mrajkishor)
 
-Phone Clone copies your data from your old Android phone to your new Android phone. This policy explains what the app accesses, where that data goes, and what it never does.
+PhoneHop copies your data from your old Android phone to your new Android phone. This policy explains what the app accesses, where that data goes, and what it never does.
 
 ## The short version
 
@@ -40,7 +42,7 @@ The app transfers only the categories **you** switch on, and only after **you** 
 
 - **On the new phone:** the files, contacts, messages, call history, calendar events, apps, wallpaper and ringtones you chose to transfer, plus a small record of which files were received. This record is used to skip files that are already there and to resume interrupted transfers. Partly received files are kept in a hidden folder (`.phonetransfer_tmp`) until the transfer completes.
 - **On the old phone:** a small record of the last unfinished transfer (the new phone's local address, the pairing code and the categories you chose), so you can continue with one tap. It's deleted when a transfer completes.
-- **On both phones (from version 5.6.0):** a *transfer snapshot* for each transfer, in `Documents/Phone Clone/Snapshots`. It lists the file names, folders and sizes, the counts per type and the result for each extra (for example "120 messages added"). It contains no file contents, message texts or contact details. It stays until you delete it, even if you uninstall the app. You can delete it with your Files app at any time. It only leaves the phone if you share it yourself with the export button.
+- **On both phones (from version 5.6.0):** a *transfer snapshot* for each transfer, in `Documents/PhoneHop/Snapshots`. It lists the file names, folders and sizes, the counts per type and the result for each extra (for example "120 messages added"). It contains no file contents, message texts or contact details. It stays until you delete it, even if you uninstall the app. You can delete it with your Files app at any time. It only leaves the phone if you share it yourself with the export button.
 - All of this stays on your phones. You can remove it at any time by clearing the app's storage or uninstalling the app.
 
 ## What the app never does
@@ -53,12 +55,12 @@ The app transfers only the categories **you** switch on, and only after **you** 
 
 ## Children
 
-Phone Clone is a general-purpose utility and is not directed at children.
+PhoneHop is a general-purpose utility and is not directed at children.
 
 ## Your choices
 
 - You choose which categories to transfer, and you can stop or pause at any time.
-- You can revoke permissions in Android *Settings → Apps → Phone Clone → Permissions*.
+- You can revoke permissions in Android *Settings → Apps → PhoneHop → Permissions*.
 - To remove everything the app stored, uninstall it or clear its storage. Files you transferred stay on your new phone until you delete them, like any other files.
 
 ## Changes to this policy

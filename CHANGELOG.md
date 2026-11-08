@@ -1,12 +1,13 @@
 # Changelog
 
-All notable changes to **Android Phone Clone (Phone Transfer)** are listed here.
+All notable changes to **PhoneHop** (formerly *Phone Clone*, and before that *Phone Transfer*) are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-> **Latest release: 5.6.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
+> **Latest release: 5.7.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.7.0](#570--2026-11-09) | Renamed **PhoneHop** | 5 | ✅ | ~20 min |
 | [5.6.0](#560--2026-11-09) | Transfer snapshots: all 3 tabs kept forever, export & import; Show in Files app fixed | 5 | ✅ | ~45 min |
 | [5.5.1](#551--2026-11-09) | Counts after a pause; tidier labels; README screenshots | 5 | ✅ | ~40 min |
 | [5.5.0](#550--2026-11-09) | Preview: every file has Open and Show in Files app buttons | 5 | ✅ | ~15 min |
@@ -25,7 +26,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [5.6.0] — 2026-11-09 *(latest release)*
+## [5.7.0] — 2026-11-09 *(latest release)*
+
+### Changed
+- **Renamed to PhoneHop.** Huawei already has a well-known app called *Phone Clone*. The new name is used in the launcher, title, notifications, popups, Play listing, feature graphic and privacy policy. The package (`com.mrajkishor.phoneclone`) is unchanged, so it **updates in place** and keeps its data.
+- Snapshots are now saved in **Documents › PhoneHop › Snapshots** as `PhoneHop - Sent 2026-11-09 01.34.05.json`. Snapshots from 5.6.0 in *Documents › Phone Clone › Snapshots* are still shown and can still be imported. Neither folder is included when the old phone is scanned.
+- README: every v5 feature (a v1 → v5 table and a v5 feature section) and 21 screenshots, regenerated with the new name.
+
+## [5.6.0] — 2026-11-09
 
 ### Added
 - **Transfer snapshots.** Every transfer leaves a read-only snapshot of **all three tabs**: Progress (outcome, totals, the per-type table, failures), Files and Extras. It's what you'd see if the phones were still connected, so the new phone keeps a full record after the old phone is gone.

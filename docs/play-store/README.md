@@ -1,10 +1,10 @@
-# 🚀 Google Play launch kit — Phone Clone
+# 🚀 Google Play launch kit — PhoneHop
 
 Everything needed before and during the Google Play launch. **Nothing here has been uploaded to Google Play yet.**
 
 | | |
 |---|---|
-| App name | **Phone Clone** |
+| App name | **PhoneHop** |
 | Package (application ID) | `com.mrajkishor.phoneclone` *(permanent: never change it)* |
 | First Play version | **4.2.2** (version code **8**): standard permissions only. The 5.x preview needs restricted access, see below |
 | Target / min SDK | 36 (Android 16) / 24 (Android 7.0) |
@@ -13,7 +13,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 ## ✅ Done before opening Play Console
 
 - [x] Unique package name (Play doesn't accept `com.example`)
-- [x] App renamed to **Phone Clone** (launcher, title, notifications)
+- [x] App renamed to **PhoneHop** (launcher, title, notifications)
 - [x] Release signing with an **upload key** (`android/key.properties`, never committed)
 - [x] Target API 36, as required for new apps from 31 Aug 2026
 - [x] New launcher icon: adaptive, round and themed (monochrome) variants
@@ -29,7 +29,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 > Your account is a **new personal developer account**, so Google requires a **closed test with at least 12 testers who stay opted in for 14 consecutive days** before you can apply for production access.
 
 1. **Create the developer account** at play.google.com/console (US$25 one-time; identity verification).
-2. **Create the app** → name *Phone Clone* → App → Free.
+2. **Create the app** → name *PhoneHop* → App → Free.
 3. **Play App Signing** → keep the default (*Google generates and protects the app signing key*). Your upload key is the one in `phone-clone-upload.jks`.
 4. **Internal testing** → create a release → upload `PhoneClone-v4.2.2.aab` → add yourself and a few friends → install on two real phones and test a full transfer. Take the **screenshots** here.
 5. **App content** → fill in every form using [`declarations.md`](declarations.md). The **All files access**, **foreground service** and **SMS / call log** forms each need a short screen recording.
@@ -63,4 +63,4 @@ Before every new Play upload, raise the version in `pubspec.yaml` (e.g. `4.1.1+6
 
 ## ℹ️ The Play app vs. the sideloaded APKs
 
-The sideloaded v3.0.0 / v4.0.0 APKs on GitHub are a **different app** (`com.example.phone_transfer`, "Phone Transfer"). They can't be updated to the Play version. Users install *Phone Clone* from Play as a new app, and can uninstall the old one afterwards.
+The sideloaded v3.0.0 / v4.0.0 APKs on GitHub are a **different app** (`com.example.phone_transfer`, "Phone Transfer"). They can't be updated to the Play version. Users install *PhoneHop* from Play as a new app, and can uninstall the old one afterwards.

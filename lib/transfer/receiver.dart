@@ -373,7 +373,7 @@ class ReceiverService extends ChangeNotifier {
     final total = sender['totalBytes'] as int? ?? expectedBytes;
     final pct = total == 0 ? -1 : (done * 100 ~/ total);
     if (senderLost) {
-      Native.updateNotification('Connection to the old phone lost', 'Open Phone Clone to reconnect', -1);
+      Native.updateNotification('Connection to the old phone lost', 'Open PhoneHop to reconnect', -1);
     } else if (senderPaused) {
       Native.updateNotification(
           'Transfer paused on the old phone', '${formatBytes(done)} of ${formatBytes(total)}', -1);
@@ -986,7 +986,7 @@ class ReceiverService extends ChangeNotifier {
   }
 
   /// A read-only snapshot of this transfer (Progress, Files and Extras), kept forever
-  /// in Documents/Phone Clone/Snapshots.
+  /// in Documents/PhoneHop/Snapshots.
   Future<void> _saveReport(String outcome) async {
     await TransferReport(
       false,

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Lets the phone's own apps (Gallery, PDF viewer, player…) open a file the user taps in Phone Clone. -->
+<!-- Lets the phone's own apps (Gallery, PDF viewer, player…) open a file the user taps in PhoneHop. -->
 <paths>
     <external-path name="storage" path="." />
     <root-path name="volumes" path="/storage" />

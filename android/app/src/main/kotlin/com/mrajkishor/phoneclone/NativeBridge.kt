@@ -68,7 +68,7 @@ class NativeBridge(private val ctx: Context) {
                         try {
                             TransferService.start(
                                 ctx,
-                                call.argument<String>("title") ?: "Phone Clone",
+                                call.argument<String>("title") ?: "PhoneHop",
                                 call.argument<String>("text") ?: "",
                                 call.argument<Boolean>("sending") ?: true
                             )

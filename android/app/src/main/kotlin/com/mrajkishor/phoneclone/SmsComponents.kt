@@ -17,13 +17,13 @@ import android.widget.TextView
 
 /*
  * Android only lets the *default SMS app* write messages. While messages are
- * being restored, Phone Clone briefly takes that role, so it must provide the
+ * being restored, PhoneHop briefly takes that role, so it must provide the
  * components every SMS app has. They are deliberately minimal: incoming texts
  * are saved to the inbox so nothing is lost, and the user is reminded to switch
  * back to their usual messaging app.
  */
 
-/** Saves any SMS that arrives while Phone Clone is the default SMS app. */
+/** Saves any SMS that arrives while PhoneHop is the default SMS app. */
 class SmsDeliverReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_DELIVER_ACTION) return
@@ -56,7 +56,7 @@ class HeadlessSmsSendService : Service() {
     }
 }
 
-/** Opened if the user taps an SMS link while Phone Clone is the default SMS app. */
+/** Opened if the user taps an SMS link while PhoneHop is the default SMS app. */
 class ComposeSmsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,7 +66,7 @@ class ComposeSmsActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(pad, pad, pad, pad)
             addView(TextView(this@ComposeSmsActivity).apply {
-                text = "Phone Clone is only your SMS app while it restores messages.\n\n" +
+                text = "PhoneHop is only your SMS app while it restores messages.\n\n" +
                     "Switch back to your usual messaging app to send messages."
                 textSize = 17f
             })

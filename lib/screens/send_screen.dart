@@ -203,7 +203,7 @@ class _SendBodyState extends State<_SendBody> {
   }
 
   /// A read-only snapshot of this transfer (Progress, Files and Extras), kept forever
-  /// in Documents/Phone Clone/Snapshots.
+  /// in Documents/PhoneHop/Snapshots.
   Future<void> _saveReport(SenderService s) async {
     await TransferReport(
       true,
@@ -474,7 +474,7 @@ class _SendBodyState extends State<_SendBody> {
             if (s.selectedExtras.contains(e)) e
         ],
         onRetry: s.canSendExtras ? s.retryExtra : null,
-        retryHint: 'Update the new phone to Phone Clone 5 or later, then start the transfer again.',
+        retryHint: 'Update the new phone to PhoneHop 5 or later, then start the transfer again.',
       ),
       filesBadge: failed,
       extrasBadge: waitingExtra ? 1 : 0,
@@ -705,8 +705,8 @@ class _SendBodyState extends State<_SendBody> {
       const ListTile(
         leading: Icon(Icons.lock_outline),
         title: Text('Your files on this phone weren’t changed'),
-        subtitle: Text('Files were only read, never moved or deleted. Phone Clone only adds its snapshot '
-            'of this transfer in Documents › Phone Clone › Snapshots.'),
+        subtitle: Text('Files were only read, never moved or deleted. PhoneHop only adds its snapshot '
+            'of this transfer in Documents › PhoneHop › Snapshots.'),
       ),
       const SizedBox(height: 16),
       if (!allGood)

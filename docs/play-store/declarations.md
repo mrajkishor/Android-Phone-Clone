@@ -1,6 +1,6 @@
 # Play Console declarations — ready-to-paste answers
 
-These are the **App content** forms Play asks for (*Play Console → Policy → App content*), with suggested answers for Phone Clone. Read each answer before submitting: you are the one declaring it to Google.
+These are the **App content** forms Play asks for (*Play Console → Policy → App content*), with suggested answers for PhoneHop. Read each answer before submitting: you are the one declaring it to Google.
 
 ---
 
@@ -12,7 +12,7 @@ These are the **App content** forms Play asks for (*Play Console → Policy → 
 - **Description:**
 
 ```
-Phone Clone is a phone-to-phone migration app: its core and only purpose is to help users move their data from their old Android phone to their new one over a local Wi-Fi connection.
+PhoneHop is a phone-to-phone migration app: its core and only purpose is to help users move their data from their old Android phone to their new one over a local Wi-Fi connection.
 
 All files access is required on both phones:
 - On the old phone, the app must find and read every file the user owns across shared storage (Documents, Download, DCIM, Pictures, Music, WhatsApp media folders, SD card, etc.), including file types that are not in the MediaStore (PDF, Office documents, archives, APKs), so that nothing is left behind.
@@ -35,7 +35,7 @@ The Storage Access Framework is not sufficient: Android 11+ does not allow a use
 - **Description:**
 
 ```
-While a phone-to-phone transfer is running, Phone Clone runs a dataSync foreground service on both phones: on the old phone it uploads the user's files and contacts, on the new phone it receives and saves them. Transfers of tens of gigabytes take many minutes, and users switch apps or turn the screen off meanwhile. The service shows an ongoing notification with live progress, starts only when the user starts a transfer (or opens the receive screen), and stops as soon as the transfer finishes, is stopped by the user, or the user leaves the screen.
+While a phone-to-phone transfer is running, PhoneHop runs a dataSync foreground service on both phones: on the old phone it uploads the user's files and contacts, on the new phone it receives and saves them. Transfers of tens of gigabytes take many minutes, and users switch apps or turn the screen off meanwhile. The service shows an ongoing notification with live progress, starts only when the user starts a transfer (or opens the receive screen), and stops as soon as the transfer finishes, is stopped by the user, or the user leaves the screen.
 ```
 
 - **User impact if deferred or interrupted:** *the transfer would stop partway and the user would have to restart it.*
@@ -50,7 +50,7 @@ While a phone-to-phone transfer is running, Phone Clone runs a dataSync foregrou
 | Question | Answer |
 |---|---|
 | Core functionality | **Backup and restore for users** (also fits *Device migration / phone transfer*) |
-| Description | *Phone Clone copies the user's own messages and call history from their old phone to their new phone, over their local Wi-Fi, when the user turns on "Messages" or "Call history" and starts a transfer. On the new phone the app asks to become the default SMS app only while it writes the messages, then helps the user switch back. Nothing is sent to any server.* |
+| Description | *PhoneHop copies the user's own messages and call history from their old phone to their new phone, over their local Wi-Fi, when the user turns on "Messages" or "Call history" and starts a transfer. On the new phone the app asks to become the default SMS app only while it writes the messages, then helps the user switch back. Nothing is sent to any server.* |
 | Default SMS handler | Requested temporarily on the new phone (`RoleManager.ROLE_SMS`) |
 | Video | Old phone: choose *Messages* → transfer. New phone: *Allow* popup → default-SMS prompt → messages appear → *Switch back* |
 

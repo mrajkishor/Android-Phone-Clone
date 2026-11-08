@@ -103,7 +103,10 @@ class SnapshotApp {
 /// after the app is uninstalled. Never changed once written; can be shared and imported.
 class TransferReport {
   static const format = 'phone-clone-snapshot';
-  static const folderName = 'Documents/Phone Clone/Snapshots';
+  static const folderName = 'Documents/PhoneHop/Snapshots';
+
+  /// Where 5.6.0 (still called Phone Clone) kept them; still read.
+  static const oldFolderName = 'Documents/Phone Clone/Snapshots';
 
   final bool sent; // true on the old phone
   final DateTime when;
@@ -174,7 +177,7 @@ class TransferReport {
 
   // ---------------- storage ----------------
 
-  /// Documents/Phone Clone/Snapshots on internal storage.
+  /// Documents/PhoneHop/Snapshots on internal storage.
   static Future<Directory> folder() async {
     final roots = await Native.storageRoots();
     return Directory(p.join(roots.first, folderName));
@@ -189,9 +192,9 @@ class TransferReport {
     try {
       final dir = await folder();
       await dir.create(recursive: true);
-      var f = File(p.join(dir.path, 'Phone Clone - $name.json'));
+      var f = File(p.join(dir.path, 'PhoneHop - $name.json'));
       for (var i = 2; await f.exists(); i++) {
-        f = File(p.join(dir.path, 'Phone Clone - $name ($i).json'));
+        f = File(p.join(dir.path, 'PhoneHop - $name ($i).json'));
       }
       await f.writeAsString(jsonEncode(toJson()));
       return TransferReport.fromJson(toJson(), path: f.path);
@@ -214,8 +217,10 @@ class TransferReport {
   static Future<List<TransferReport>> all() async {
     final out = <TransferReport>[];
     try {
-      final dir = await folder();
-      if (await dir.exists()) {
+      final roots = await Native.storageRoots();
+      for (final name in [folderName, oldFolderName]) {
+        final dir = Directory(p.join(roots.first, name));
+        if (!await dir.exists()) continue;
         for (final e in dir.listSync()) {
           if (e is File && e.path.toLowerCase().endsWith('.json')) {
             final r = await _read(e);
@@ -239,7 +244,7 @@ class TransferReport {
   }
 
   /// Adds a snapshot file someone shared (e.g. from Drive or WhatsApp). Returns it, or
-  /// null if the file isn't a Phone Clone snapshot. Importing the same one twice keeps one copy.
+  /// null if the file isn't a PhoneHop snapshot. Importing the same one twice keeps one copy.
   static Future<TransferReport?> import(List<int> bytes) async {
     try {
       final m = jsonDecode(utf8.decode(bytes)) as Map;

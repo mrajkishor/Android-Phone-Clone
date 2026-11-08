@@ -1,17 +1,17 @@
 <div align="center">
 
-# 📱➡️📱 Android Phone Clone
+# 📱➡️📱 PhoneHop
 
 ### Move *everything* from your old Android phone to your new one — over Wi-Fi, fast, verified, without duplicates.
 
-[![Release](https://img.shields.io/badge/release-v5.6.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.6.0)
+[![Release](https://img.shields.io/badge/release-v5.7.0-2ea44f?style=for-the-badge&logo=github)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.7.0)
 [![Standard edition](https://img.shields.io/badge/standard%20permissions-v4.2.2-blue?style=for-the-badge)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)
 [![Platform](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#-requirements)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Tests](https://img.shields.io/badge/tests-16%20passing-brightgreen?style=for-the-badge)](#-testing)
 [![No cloud](https://img.shields.io/badge/cloud-none-lightgrey?style=for-the-badge)](#-privacy--safety)
 
-**[⬇️ Download the APK (v5.6.0)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.6.0)** ·
+**[⬇️ Download the APK (v5.7.0)](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.7.0)** ·
 [Quick start](#-quick-start) ·
 [Features](#-features) ·
 [How it works](#-how-it-works) ·
@@ -21,7 +21,7 @@
 </div>
 
 > [!TIP]
-> **Latest release: Phone Clone 5.6.0** → [`apk/PhoneClone-v5.6.0.apk`](apk/PhoneClone-v5.6.0.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and every transfer leaves a **snapshot** of all three tabs that you keep, export and import. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs.
+> **Latest release: PhoneHop 5.7.0** → [`apk/PhoneHop-v5.7.0.apk`](apk/PhoneHop-v5.7.0.apk). Files, contacts, messages, call history, calendar, apps, wallpaper and ringtones. A **Files** tab compares old and new phone file by file, with Open and Show in Files app buttons, and every transfer leaves a **snapshot** of all three tabs that you keep, export and import. Package `com.mrajkishor.phoneclone`. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. *PhoneHop was called **Phone Clone** up to 5.6.0; it updates in place.*
 
 > [!WARNING]
 > **Some v5 Extras need restricted access.** Messages and call history use permissions that Google restricts, so **Play Protect may block the install from WhatsApp or a browser**. Install it over USB (`adb install`) or turn off Play Protect scanning while installing. Google Play allows them only after a manual review. See [Extras that need restricted access](#-v5-extras-that-need-restricted-access). Prefer standard permissions only? Use **[v4.2.2](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2)** ([`apk/PhoneClone-v4.2.2.apk`](apk/PhoneClone-v4.2.2.apk)).
@@ -31,7 +31,7 @@
 ## 📑 Table of contents
 
 - [Screenshots](#-screenshots)
-- [Why v4?](#-why-v4)
+- [How it grew: v1 → v5](#-how-it-grew-v1--v5)
 - [Features](#-features)
 - [Quick start](#-quick-start)
 - [Upgrading from v3](#%EF%B8%8F-upgrading-from-v3)
@@ -107,7 +107,7 @@ Every feature, screen by screen, with the version that added it. *These are the 
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/home-02-snapshot-summary.png" width="240" alt="Snapshot summary"> | <img src="docs/screenshots/home-03-snapshot-files.png" width="240" alt="Snapshot files"> | <img src="docs/screenshots/home-04-snapshot-extras.png" width="240" alt="Snapshot extras"> |
 
-| **All snapshots + Import** · v5.6<br>stored in *Documents › Phone Clone › Snapshots* |
+| **All snapshots + Import** · v5.6<br>stored in *Documents › PhoneHop › Snapshots* |
 |:---:|
 | <img src="docs/screenshots/home-05-snapshots.png" width="240" alt="All snapshots"> |
 
@@ -115,33 +115,38 @@ Every feature, screen by screen, with the version that added it. *These are the 
 
 ---
 
-## 🚀 Why v4?
+## 🚀 How it grew: v1 → v5
 
-This app was built in four rounds. Each version fixed real gaps found in the one before it, and **v4 contains everything from v1, v2 and v3**:
+The app was built in rounds. Each version fixed real gaps found in the one before it, and **v5 contains everything from v1–v4**:
 
-| | **v1** — *It works* | **v2** — *It's exact* | **v3** — *It's unstoppable* | **v4** — *It's fast* |
-|---|:---:|:---:|:---:|:---:|
-| Photos, videos, music, contacts | ✅ | ✅ | ✅ | ✅ |
-| QR-code pairing over local Wi-Fi | ✅ | ✅ | ✅ | ✅ |
-| Documents & other files | ✋ picked by hand | ✅ found automatically | ✅ | ✅ |
-| Same folders as the old phone | ❌ flattened | ✅ | ✅ | ✅ |
-| Original photo/video dates | ❌ reset to today | ✅ | ✅ | ✅ |
-| SHA-256 checksum on every file | ❌ | ✅ | ✅ | ✅ in background threads |
-| No duplicates on re-runs | ❌ | ✅ index | ✅ index + content check | ✅ |
-| Progress | file count | bytes, %, speed, ETA | live per-file bytes | **every file in flight** |
-| Timeouts & retry queue (DLQ) | ❌ | ❌ | ✅ exponential backoff | ✅ |
-| Pause / resume | ❌ | ❌ | ✅ from the exact byte | ✅ |
-| Survives Wi-Fi drops & app close | ❌ | ❌ | ✅ | ✅ |
-| **Files in flight at once** | 1 | 1 | 1 | **2–6, adapts to your Wi-Fi** |
-| **Small files** | one request each | one request each | one request each | **up to 300 per request** |
-| **Identical files in two folders** | sent twice | sent twice | sent twice | **sent once, copied on the new phone** |
-| **Media index updates** | after every file | after every file | after every file | **in batches** |
-| **Continue without scanning again** | ❌ | ❌ | ❌ | ✅ one tap |
-| **Update mid-transfer** | — | — | — | ✅ from v3, picks up where it paused |
-| End report | counts | per-category table | 🎉 or failed-file list | 🎉 or failed-file list + speed-ups |
+| | **v1** — *It works* | **v2** — *It's exact* | **v3** — *It's unstoppable* | **v4** — *It's fast* | **v5** — *It's everything* |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Photos, videos, music, contacts | ✅ | ✅ | ✅ | ✅ | ✅ |
+| QR-code pairing over local Wi-Fi | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Documents & other files | ✋ picked by hand | ✅ found automatically | ✅ | ✅ | ✅ |
+| Same folders as the old phone | ❌ flattened | ✅ | ✅ | ✅ | ✅ |
+| Original photo/video dates | ❌ reset to today | ✅ | ✅ | ✅ | ✅ |
+| SHA-256 checksum on every file | ❌ | ✅ | ✅ | ✅ in background threads | ✅ |
+| No duplicates on re-runs | ❌ | ✅ index | ✅ index + content check | ✅ | ✅ |
+| Progress | file count | bytes, %, speed, ETA | live per-file bytes | **every file in flight** | every file in flight + **Files tab** |
+| Timeouts & retry queue (DLQ) | ❌ | ❌ | ✅ exponential backoff | ✅ | ✅ |
+| Pause / resume | ❌ | ❌ | ✅ from the exact byte | ✅ | ✅ |
+| Survives Wi-Fi drops & app close | ❌ | ❌ | ✅ | ✅ | ✅ |
+| **Files in flight at once** | 1 | 1 | 1 | **2–6, adapts to your Wi-Fi** | ✅ |
+| **Small files** | one request each | one request each | one request each | **up to 300 per request** | ✅ |
+| **Identical files in two folders** | sent twice | sent twice | sent twice | **sent once, copied on the new phone** | ✅ |
+| **Media index updates** | after every file | after every file | after every file | **in batches** | ✅ |
+| **Continue without scanning again** | ❌ | ❌ | ❌ | ✅ one tap | ✅ |
+| **Update mid-transfer** | — | — | — | ✅ from v3, picks up where it paused | ✅ |
+| **Messages, call history, calendar** | ❌ | ❌ | ❌ | ❌ | ✅ *(restricted access)* |
+| **Installed apps, wallpaper, ringtones** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Compare old vs new, file by file** | ❌ | ❌ | ❌ | ❌ | ✅ Files tab, grouped, thumbnails |
+| **Open a file / show it in the Files app** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Record of the transfer after the old phone is gone** | ❌ | ❌ | ❌ | ❌ | ✅ snapshots, export & import |
+| End report | counts | per-category table | 🎉 or failed-file list | 🎉 or failed-file list + speed-ups | 🎉 + **snapshot kept forever** |
 
 > [!NOTE]
-> In short: **v1** proved the idea, **v2** made every copy exact and duplicate-free, **v3** made long transfers survive timeouts, Wi-Fi drops, pauses and the app being closed, and **v4** makes it **several times faster**, especially for phones full of photos and small files. Full details are in the [CHANGELOG](CHANGELOG.md).
+> In short: **v1** proved the idea, **v2** made every copy exact and duplicate-free, **v3** made long transfers survive timeouts, Wi-Fi drops, pauses and the app being closed, **v4** made it **several times faster**, especially for phones full of photos and small files, and **v5** moves **more than files**: messages, call history, calendar, apps, wallpaper and ringtones. It adds a **Files** tab that compares the two phones and a **snapshot** of every transfer you keep for good. Full details are in the [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -185,6 +190,26 @@ Press Home, Back, or swipe the app away. The transfer keeps going, with progress
 
 ### ⚡ Fast *(new in v4)*
 **2–6 files in flight at once**, tuned automatically to your Wi-Fi. **Small files travel in batches** of up to 300 per request. **Identical files are sent once** and copied on the new phone. Checksums run in background threads, and Android's media index is updated in batches. Typical gain for a phone full of photos: **3–8× faster than v3**.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🧩 More than files *(v5)*
+**Messages (SMS & MMS), call history, calendar, installed apps, wallpaper, ringtones** and contact groups. Each is a switch, and each permission is asked in a popup first. Nothing already on the new phone is removed or duplicated. Messages and call history are marked **Restricted** ([why](#-v5-extras-that-need-restricted-access)).
+
+### 🗂️ Files tab: compare both phones *(v5)*
+Every file and where it stands: **on the new phone**, **pending**, **failed** or **restricted**. Group by **type, folder or status**, with coloured bars, **thumbnails and app icons**, filters and search. Every file has **Open** and **Show in Files app**.
+
+</td>
+<td width="50%" valign="top">
+
+### 🧩 Extras tab *(v5)*
+A card per extra with a plain status (*Copying… 320 of 840*, *Waiting · starts after all files are copied*), the same numbers on both phones, and **Try again** for anything skipped.
+
+### 🗃️ Snapshots, kept forever *(v5.6)*
+Every transfer leaves a read-only **snapshot of all three tabs** in *Documents › PhoneHop › Snapshots*. It stays after the old phone is gone, even if the app is uninstalled. **Export** it with the share button, **import** it on another phone.
 
 </td>
 </tr>
@@ -328,7 +353,7 @@ Android reserves these for system tools such as Google's setup restore or Samsun
 | Not transferred | Alternative |
 |---|---|
 | App data and logins (inside apps) | Each app's own backup / sign in again; Google account restore |
-| WhatsApp & other in-app chat histories | WhatsApp's own **Transfer chats** (Settings → Chats → Transfer chats), phone to phone without Google Drive; or a local backup that Phone Clone copies |
+| WhatsApp & other in-app chat histories | WhatsApp's own **Transfer chats** (Settings → Chats → Transfer chats), phone to phone without Google Drive; or a local backup that PhoneHop copies |
 | Wi-Fi passwords, system settings | Google account restore |
 | `Android/data` and `Android/obb` folders | Private to each app by design. Listed as **Restricted** in the Files tab |
 
@@ -344,7 +369,7 @@ v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), 
 
 | Extra (v5) | Access needed | Verdict |
 |---|---|:---:|
-| 💬 **Messages** (SMS & MMS) | Read SMS on the old phone; on the new phone Phone Clone must become the **default SMS app** for a moment | 🔴 **Restricted, invasive** |
+| 💬 **Messages** (SMS & MMS) | Read SMS on the old phone; on the new phone PhoneHop must become the **default SMS app** for a moment | 🔴 **Restricted, invasive** |
 | 📞 **Call history** | Read and write the **call log** | 🔴 **Restricted, invasive** |
 | 📅 **Calendar** | Read and write **calendar** events | 🟠 Extra personal-data access |
 | 🔔 **Ringtones & sounds** | **Modify system settings** (special access) | 🟠 Changes system settings |
@@ -365,7 +390,7 @@ v1–v4 use only **standard permissions**: storage, contacts, camera (QR code), 
 - Folders Android doesn't let any app read (`Android/data`, `Android/obb`) are listed as **Restricted** instead of being silently skipped.
 - WhatsApp: its own **Transfer chats** is recommended.
 - Every file has **Open** and **Show in Files app** buttons.
-- **Transfer snapshots** on both phones: every transfer is kept as a read-only snapshot of its Progress, Files and Extras tabs in *Internal storage › Documents › Phone Clone › Snapshots*, so the record stays after the old phone is gone (even if the app is uninstalled). **Export** shares it (Drive, WhatsApp, email); **Import** opens one shared from the other phone.
+- **Transfer snapshots** on both phones: every transfer is kept as a read-only snapshot of its Progress, Files and Extras tabs in *Internal storage › Documents › PhoneHop › Snapshots*, so the record stays after the old phone is gone (even if the app is uninstalled). **Export** shares it (Drive, WhatsApp, email); **Import** opens one shared from the other phone.
 
 
 
@@ -619,7 +644,7 @@ Contacts use their own check: phone numbers (last 10 digits), email addresses, o
 
 - 🏠 **Local only.** Data travels directly between the two phones over your Wi-Fi or hotspot. There's no cloud, account or internet connection involved.
 - 🔑 **Paired.** Every request needs the 6-digit code shown on the new phone.
-- 👀 **Your files on the old phone are read-only.** The sending code only reads them, and the tests verify they are byte-for-byte unchanged. The only thing Phone Clone writes there is its own transfer snapshot in *Documents › Phone Clone › Snapshots*.
+- 👀 **Your files on the old phone are read-only.** The sending code only reads them, and the tests verify they are byte-for-byte unchanged. The only thing PhoneHop writes there is its own transfer snapshot in *Documents › PhoneHop › Snapshots*.
 - 🗃️ **Snapshots** list file names, folders, sizes and counts. They hold no file contents, message texts or contact details, and leave the phone only if you share them.
 - ⚠️ Traffic is plain HTTP inside your local network. Use a network you trust, such as your home Wi-Fi or the new phone's own hotspot.
 
@@ -753,7 +778,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| [**v5.6.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.6.0) · *latest release* | Snapshots | Every transfer kept as a read-only **snapshot** of Progress, Files and Extras in *Documents › Phone Clone › Snapshots*; export & import; *Show in Files app* opens the exact folder | **~45 min** |
+| [**v5.7.0**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v5.7.0) · *latest release* | PhoneHop | Renamed from *Phone Clone* to **PhoneHop** (Huawei already has an app called Phone Clone); README with every v5 feature and 21 screenshots | **~20 min** |
+| v5.6.0 | Snapshots | Every transfer kept as a read-only **snapshot** of Progress, Files and Extras in *Documents › PhoneHop › Snapshots*; export & import; *Show in Files app* opens the exact folder | **~45 min** |
 | v5.5.1 | Polish | Files copied before a pause no longer counted as "already there"; tidier labels; README screenshots | **~40 min** |
 | v5.5.0 | Actions | Every file has **Open** and **Show in Files app** buttons; status badge on the thumbnail | **~15 min** |
 | v5.4.1 | Fix | Both phones always show the same Extras numbers (installed apps, ringtones, wallpaper) | **~20 min** |
@@ -765,7 +791,7 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 | [**v4.2.2**](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.2.2) · *standard permissions* | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
 | v4.2.1 | Fix | *Looking for identical files* shows real progress and can be skipped | **~5 min** |
 | v4.2.0 | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
-| v4.1.0 | Play-ready | Renamed **Phone Clone** (`com.mrajkishor.phoneclone`), upload-key signing, new icon, privacy policy, Play launch kit | **~16 min** |
+| v4.1.0 | Play-ready | Renamed **Phone Clone** *(now PhoneHop)* (`com.mrajkishor.phoneclone`), upload-key signing, new icon, privacy policy, Play launch kit | **~16 min** |
 | [v4.0.0](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v4.0.0) | Fast | 2–6 adaptive lanes, small-file batches, duplicate cloning, background checksums, batched media indexing, one-tap Continue, update from v3 mid-transfer | **~15 min** |
 | [v3.0.0](https://github.com/mrajkishor/Android-Phone-Clone/releases/tag/v3.0.0) | Unstoppable | Live per-file bytes, retry queue with backoff, pause/resume, byte-level resume, reconnect, background running | **~16 min** |
 | v2.0.0 | Exact | Automatic file detection, same folders & dates, SHA-256, index, contact dedupe | **~14 min** |

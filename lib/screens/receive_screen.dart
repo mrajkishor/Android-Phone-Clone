@@ -267,7 +267,7 @@ void _showPairingDialog(BuildContext context, ReceiverService service) {
         child: ListenableBuilder(
           listenable: service,
           builder: (_, __) => Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('On the old phone: open Phone Clone → This is the OLD phone → Scan QR code. '
+            const Text('On the old phone: open PhoneHop → This is the OLD phone → Scan QR code. '
                 'Files already here are skipped; an interrupted file continues where it stopped.'),
             const SizedBox(height: 16),
             _PairingCard(pairing: service.pairing!, size: 200),
@@ -391,7 +391,7 @@ class _ProgressView extends StatelessWidget {
               : 'Check both phones are on the same Wi-Fi or hotspot, then scan this QR code from the old phone.',
         ),
         const SizedBox(height: 16),
-        const Text('On the old phone: open Phone Clone → This is the OLD phone → Scan QR code. '
+        const Text('On the old phone: open PhoneHop → This is the OLD phone → Scan QR code. '
             'Nothing is lost: files already here are skipped and the interrupted file continues where it stopped.'),
         const SizedBox(height: 16),
         _PairingCard(pairing: s.pairing!),

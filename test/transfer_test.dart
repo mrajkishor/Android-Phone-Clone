@@ -30,7 +30,7 @@ Map<String, (String, int)> snapshot(Directory root, {bool skipTmp = true}) {
     if (e is! File) continue;
     final rel = p.relative(e.path, from: root.path);
     if (skipTmp && rel.startsWith('.phonetransfer_tmp')) continue;
-    if (rel.startsWith('Documents/Phone Clone/')) continue; // transfer snapshots
+    if (rel.startsWith('Documents/PhoneHop/') || rel.startsWith('Documents/Phone Clone/')) continue; // transfer snapshots
     out[rel] = (sha256.convert(e.readAsBytesSync()).toString(), e.lastModifiedSync().millisecondsSinceEpoch);
   }
   return out;
@@ -618,8 +618,8 @@ void main() {
     expect(report!.sent, isFalse);
     expect(report.files, hasLength(plan.files.length));
     expect(report.onNewPhone, plan.files.length);
-    // It's a full snapshot (Progress, Files, Extras) in Documents/Phone Clone/Snapshots.
-    expect(report.path, contains('Documents/Phone Clone/Snapshots/Phone Clone - Received '));
+    // It's a full snapshot (Progress, Files, Extras) in Documents/PhoneHop/Snapshots.
+    expect(report.path, contains('Documents/PhoneHop/Snapshots/PhoneHop - Received '));
     expect(report.rows.map((x) => x.label), contains('Call history'));
     expect(report.extras[Extra.calls.name]!['added'], 2);
     expect(report.apps.single.package, 'com.example.x');

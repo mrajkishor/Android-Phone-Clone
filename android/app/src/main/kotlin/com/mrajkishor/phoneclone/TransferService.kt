@@ -94,7 +94,7 @@ class TransferService : Service() {
         ensureChannel(this)
         val notification = build(
             this,
-            intent?.getStringExtra("title") ?: "Phone Clone",
+            intent?.getStringExtra("title") ?: "PhoneHop",
             intent?.getStringExtra("text") ?: "",
             -1
         )

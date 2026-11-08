@@ -1,7 +1,7 @@
 name: phone_transfer
 description: Copy everything from an old Android phone to a new one over Wi-Fi, verified and without duplicates.
 publish_to: "none"
-version: 5.6.0+18
+version: 5.7.0+19
 
 environment:
   sdk: ">=3.5.0 <4.0.0"  # Flutter 3.24+

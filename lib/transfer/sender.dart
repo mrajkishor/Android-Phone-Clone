@@ -1298,7 +1298,7 @@ class SenderService extends ChangeNotifier {
         for (final e in plan.extras) {
           extraTally[e]!
             ..state = 'skipped'
-            ..note = 'Update the new phone to Phone Clone 5 to include this';
+            ..note = 'Update the new phone to PhoneHop 5 to include this';
         }
       } else {
         for (final e in [Extra.calendar, Extra.calls, Extra.messages]) {

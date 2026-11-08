@@ -14,7 +14,7 @@
   <path d="M38 31 Q54 17 69 30" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round"/>
   <path d="M63.5 29.6 L70.6 31.4 L68.4 24.4" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="430" y="200" font-family="Inter" font-weight="700" font-size="76" fill="#FFFFFF">Phone Clone</text>
+  <text x="430" y="200" font-family="Inter" font-weight="700" font-size="76" fill="#FFFFFF">PhoneHop</text>
   <text x="432" y="262" font-family="Inter" font-weight="500" font-size="30" fill="#FFFFFF" fill-opacity="0.92">Move everything to your new phone</text>
   <text x="432" y="304" font-family="Inter" font-weight="500" font-size="30" fill="#FFFFFF" fill-opacity="0.92">over Wi-Fi. Fast, verified, no duplicates.</text>
   <g font-family="Inter" font-weight="600" font-size="22" fill="#0B4FC4">

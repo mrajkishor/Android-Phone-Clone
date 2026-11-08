@@ -29,7 +29,7 @@ String _outcomeText(TransferReport r) => switch (r.outcome) {
     };
 
 /// Where snapshots are kept, in words people can find in their Files app.
-const snapshotFolderText = 'Internal storage › Documents › Phone Clone › Snapshots';
+const snapshotFolderText = 'Internal storage › Documents › PhoneHop › Snapshots';
 
 void _say(BuildContext context, String text) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()
@@ -42,7 +42,7 @@ Future<TransferReport?> importSnapshot(BuildContext context) async {
   final r = await TransferReport.import(picked.$2);
   if (!context.mounted) return null;
   if (r == null) {
-    _say(context, '“${picked.$1 ?? 'This file'}” isn’t a Phone Clone snapshot.');
+    _say(context, '“${picked.$1 ?? 'This file'}” isn’t a PhoneHop snapshot.');
     return null;
   }
   _say(context, 'Snapshot imported into $snapshotFolderText');
@@ -132,7 +132,7 @@ class SnapshotScreen extends StatelessWidget {
 
   Future<void> _share(BuildContext context) async {
     final path = report.path;
-    final ok = path != null && await NativeExtras.shareFile(path, title: 'Phone Clone snapshot · ${report.name}');
+    final ok = path != null && await NativeExtras.shareFile(path, title: 'PhoneHop snapshot · ${report.name}');
     if (!ok && context.mounted) _say(context, 'Couldn’t share this snapshot.');
   }
 
@@ -224,7 +224,7 @@ class _Summary extends StatelessWidget {
           title: Text('Snapshot · read-only', style: TextStyle(color: cs.onSecondaryContainer)),
           subtitle: Text(
             'Saved on this phone in $snapshotFolderText. It stays there after the other phone is gone '
-            'and even if Phone Clone is uninstalled. Share it with the export button above.',
+            'and even if PhoneHop is uninstalled. Share it with the export button above.',
             style: TextStyle(color: cs.onSecondaryContainer),
           ),
           isThreeLine: true,
@@ -236,7 +236,7 @@ class _Summary extends StatelessWidget {
       Text(_outcomeText(r), style: t.headlineSmall, textAlign: TextAlign.center),
       Text(
         '${r.sent ? 'Sent from this phone' : 'Received on this phone'} · ${_when(r.when)}'
-        '${r.appVersion.isEmpty ? '' : ' · Phone Clone ${r.appVersion}'}',
+        '${r.appVersion.isEmpty ? '' : ' · PhoneHop ${r.appVersion}'}',
         style: t.bodySmall,
         textAlign: TextAlign.center,
       ),

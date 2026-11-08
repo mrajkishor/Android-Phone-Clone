@@ -46,7 +46,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:label="Phone Clone"
+        android:label="PhoneHop"
         android:name=".App"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"

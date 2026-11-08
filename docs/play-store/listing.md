@@ -1,11 +1,11 @@
-# Google Play store listing — Phone Clone
+# Google Play store listing — PhoneHop
 
 Copy each field into **Play Console → Grow → Store presence → Main store listing**.
 
 ## App name (max 30 characters)
 
 ```
-Phone Clone: Transfer Data
+PhoneHop: Transfer Data
 ```
 
 ## Short description (max 80 characters)
@@ -17,7 +17,7 @@ Move photos, videos, files & contacts to your new phone over Wi-Fi. No cloud.
 ## Full description (max 4,000 characters)
 
 ```
-Phone Clone moves everything from your old Android phone to your new one, directly over Wi-Fi. There's no cloud, no account and no cable.
+PhoneHop moves everything from your old Android phone to your new one, directly over Wi-Fi. There's no cloud, no account and no cable.
 
 Helping you move to a new phone is all this app does. To copy every file into the same folder it had on your old phone, it needs "All files access" on both phones.
 
@@ -52,7 +52,7 @@ PRIVATE
 Data goes only from your old phone to your new phone over your own network. No servers, no ads, no analytics, no tracking.
 
 HOW TO USE
-1. Install Phone Clone on both phones.
+1. Install PhoneHop on both phones.
 2. Connect both to the same Wi-Fi, or join the new phone's hotspot from the old one.
 3. New phone: tap "This is the NEW phone".
 4. Old phone: tap "This is the OLD phone" and scan the QR code.

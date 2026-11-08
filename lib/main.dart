@@ -15,7 +15,7 @@ class PhoneTransferApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const seed = Color(0xFF1B6EF3);
     return MaterialApp(
-      title: 'Phone Clone',
+      title: 'PhoneHop',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: seed, brightness: Brightness.dark, useMaterial3: true),
@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 24),
-                    Text('Phone Clone', style: t.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('PhoneHop', style: t.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Text(
                       'Install this app on both phones. Connect them to the same Wi-Fi, '
@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                     const Spacer(),
                     Text(
-                      'Copies photos, videos, music, documents, every other file and contacts, '
+                      'Copies every file, contacts, messages, call history, calendar, apps and more, '
                       'checksum-verified and without duplicates. Your files on the old phone are never changed, '
                       'and nothing leaves your local network.  •  v$kAppVersion',
                       textAlign: TextAlign.center,
