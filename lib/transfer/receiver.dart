@@ -149,6 +149,14 @@ class ReceiverService extends ChangeNotifier {
   @visibleForTesting
   static Duration senderSilenceLimit = const Duration(seconds: 15);
 
+  /// Screenshots: the most recently created service (the one the receive screen shows).
+  @visibleForTesting
+  static ReceiverService? debugLatest;
+
+  ReceiverService() {
+    debugLatest = this;
+  }
+
   /// Test hook: runs before an upload's bytes are read.
   @visibleForTesting
   static Future<void> Function(String name)? debugBeforeReceive;
@@ -226,6 +234,7 @@ class ReceiverService extends ChangeNotifier {
   /// Files of this session in arrival order (Files tab).
   final List<SessionFile> sessionFiles = [];
   final Map<String, SessionFile> _checkedAlready = {}; // found here by /check, before /hello
+  final Set<String> _savedNow = {}; // keys copied in this transfer
   final Map<String, String> _pathByRel = {}; // rel on the old phone -> where it was saved here
 
   /// Messages, call history, calendar, apps, wallpaper, ringtones (Extras tab).
@@ -659,6 +668,7 @@ class ReceiverService extends ChangeNotifier {
   Future<dynamic> _json(HttpRequest req) async => jsonDecode(await utf8.decodeStream(req));
 
   void _resetSession() {
+    _savedNow.clear();
     filesProcessed = bytesReceived = clonedFiles = clonedBytes = 0;
     contactsAdded = contactsExisting = contactsFailed = 0;
     senderCancelled = complete = false;
@@ -761,7 +771,7 @@ class ReceiverService extends ChangeNotifier {
       final known = _index[key];
       if (known != null && known.sha == sha && File(known.path).existsSync()) {
         if (await part.exists()) await part.delete();
-        return 'already';
+        return _savedNow.contains(key) ? 'saved' : 'already';
       }
       if (!await part.exists() || await part.length() != size) return 410;
       // A resumed file is checksummed in the background so receiving doesn't stutter.
@@ -888,6 +898,9 @@ class ReceiverService extends ChangeNotifier {
     final known = _index[key];
     if (known != null && known.sha == sha && File(known.path).existsSync()) {
       if (await part.exists()) await part.delete();
+      // Saved earlier in this same transfer, then sent again after a pause or a dropped
+      // connection: it was copied now, not "already here", and is counted once.
+      if (_savedNow.contains(key)) return 'saved';
       tally[category]!.already++;
       filesProcessed++;
       _noteFile(rel, known.path, size, 'already', category);
@@ -903,6 +916,7 @@ class ReceiverService extends ChangeNotifier {
         tally[category]!.already++;
       }
       filesProcessed++;
+      if (status == 'saved') _savedNow.add(key);
       _noteFile(rel, path, size, status, category);
       recent.insert(0, ReceivedFile(safe, size, status != 'saved'));
       if (recent.length > 6) recent.removeLast();

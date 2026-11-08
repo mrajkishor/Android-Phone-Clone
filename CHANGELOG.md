@@ -3,10 +3,11 @@
 All notable changes to **Android Phone Clone (Phone Transfer)** are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-> **Latest release: 5.5.0.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
+> **Latest release: 5.5.1.** Some v5 Extras (messages, call history) need **restricted access**; see the [README](README.md#-v5-extras-that-need-restricted-access). **4.2.2** is the standard-permissions edition.
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.5.1](#551--2026-11-09) | Counts after a pause; tidier labels; README screenshots | 5 | ✅ | ~40 min |
 | [5.5.0](#550--2026-11-09) | Preview: every file has Open and Show in Files app buttons | 5 | ✅ | ~15 min |
 | [5.4.1](#541--2026-11-09) | Preview fix: both phones always show the same Extras numbers | 5 | ✅ | ~20 min |
 | [5.4.0](#540--2026-11-09) | Preview: tap a file to open it; open folders in the Files app | 5 | ✅ | ~15 min |
@@ -23,7 +24,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [5.5.0] — 2026-11-09 *(latest release)*
+## [5.5.1] — 2026-11-09 *(latest release)*
+
+### Fixed
+- **After Pause and Resume, files copied before the pause were counted as "already there"** on both phones. A batch that was interrupted is sent again, and the new phone now recognises files it saved earlier in the same transfer: they count as copied, once.
+- "1 apps" now reads "1 app".
+- Extras on the choose screen: the *Restricted* / *Sensitive* label no longer squeezes the name onto two lines.
+- *Show in Files app* works for every file on shared storage, including SD cards with unusual paths.
+- The new phone's popup reads "Restore Messages (SMS & MMS)?", not lower-case.
+
+### Added
+- **README screenshots** of every feature, with the version that added it. They're rendered from the real screens with sample data by `test/screenshots/` (run with `SCREENSHOTS=1`).
+
+## [5.5.0] — 2026-11-09
 
 ### Added
 - **Two buttons on every file** in the Files view (during a transfer and in *Last transfer*):

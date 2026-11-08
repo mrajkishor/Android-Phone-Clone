@@ -111,7 +111,7 @@ class ExtrasScan {
         Extra.messages => '$sms SMS • $mms MMS',
         Extra.calls => '$calls calls',
         Extra.calendar => '$calendarEvents events stored on this phone (Google/Outlook calendars come back when you sign in)',
-        Extra.apps => '${apps.length} apps • ${formatBytes(apps.fold(0, (s, a) => s + a.size))}. '
+        Extra.apps => '${apps.length} ${apps.length == 1 ? 'app' : 'apps'} • ${formatBytes(apps.fold(0, (s, a) => s + a.size))}. '
             'Reinstalled on the new phone (app data and logins are not included)',
         Extra.wallpaper => 'Home and lock screen',
         Extra.ringtones => [for (final r in ringtones) '${r['type']}: ${r['title'] ?? '?'}'].join(' • '),

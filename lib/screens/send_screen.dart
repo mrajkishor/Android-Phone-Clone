@@ -18,6 +18,10 @@ import 'transfer_widgets.dart';
 class SendScreen extends StatelessWidget {
   const SendScreen({super.key});
 
+  /// Screenshots: connect to this new phone instead of scanning its QR code.
+  @visibleForTesting
+  static PairingInfo? debugPairing;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,7 +73,8 @@ class _SendBodyState extends State<_SendBody> {
   }
 
   Future<void> _scanAndConnect() async {
-    final pairing = await Navigator.push<PairingInfo>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
+    final pairing = SendScreen.debugPairing ??
+        await Navigator.push<PairingInfo>(context, MaterialPageRoute(builder: (_) => const ScanScreen()));
     if (pairing == null) return;
     await _connect(pairing);
   }
@@ -409,9 +414,9 @@ class _SendBodyState extends State<_SendBody> {
     final hint = e.needsNewPhonePermission ? '\nThe new phone asks you to allow this during the transfer.' : '';
     return SwitchListTile(
       secondary: Icon(ExtrasStatusList.iconOf(e)),
-      title: Row(children: [
-        Flexible(child: Text(e.label)),
-        if (e.restriction != null) ...[const SizedBox(width: 6), RestrictedChip(e)],
+      title: Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text(e.label),
+        if (e.restriction != null) RestrictedChip(e),
       ]),
       subtitle: Text(why ?? (n == 0 ? 'Nothing found' : '${x.summary(e)}$hint')),
       isThreeLine: why == null && n > 0,

@@ -46,7 +46,7 @@ class _ReceiveBodyState extends State<_ReceiveBody> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         icon: Icon(ExtrasStatusList.iconOf(e)),
-        title: Text('Restore ${e.label.toLowerCase()}?'),
+        title: Text('Restore ${e.label}?'),
         content: Text('${e.newPhonePrompt}\n\nNothing already on this phone is changed or removed; '
             'only missing items are added.'),
         actions: [
@@ -184,7 +184,7 @@ class _AppsCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         ListTile(
           leading: const Icon(Icons.apps),
-          title: Text('${apps.length} apps to install'),
+          title: Text('${apps.length} ${apps.length == 1 ? 'app' : 'apps'} to install'),
           subtitle: const Text('Android asks you to confirm each one. App data and logins are not included; '
               'apps from the Play Store keep updating from there.'),
           isThreeLine: true,

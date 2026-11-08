@@ -432,7 +432,8 @@ class _FileCompareListState extends State<FileCompareList> {
   }
 
   /// The file can be shown in the Files app: it is on this phone's shared storage.
-  static bool _inSharedStorage(FileRow r) => r.path?.startsWith('/storage/') ?? false;
+  /// Not an installed app's own APK (in /data/app), which the Files app can't show.
+  static bool _inSharedStorage(FileRow r) => r.path != null && !r.path!.startsWith('/data/');
 
   Future<void> _showInFolder(BuildContext context, FileRow r) async {
     var ok = false;

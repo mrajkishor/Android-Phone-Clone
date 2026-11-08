@@ -297,6 +297,8 @@ void main() {
     expect(s.dlq, isEmpty, reason: 'pausing is not a failure');
     expect(s.resumedBytes, greaterThan(0), reason: 'continued from the bytes already received');
     expect(snapshot(newRoot), expectedCopy(before), reason: 'the resumed file is byte-for-byte identical');
+    expect(s.filesAlready, 0, reason: 'files copied before the pause count as copied, not "already there"');
+    expect(r.alreadyTotal, 0);
     s.dispose();
     await r.stop();
   });
