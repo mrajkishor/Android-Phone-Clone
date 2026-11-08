@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_contacts/flutter_contacts.dart';
 
+import 'extras.dart';
 import 'native.dart';
 import 'protocol.dart';
 
@@ -51,7 +52,26 @@ class LaneView {
 class SendPlan {
   final List<FileEntry> files;
   final List<Contact> contacts;
-  const SendPlan(this.files, this.contacts);
+
+  /// Messages, call history, calendar, apps, wallpaper, ringtones (needs a v5 new phone).
+  final Set<Extra> extras;
+  final ExtrasScan? extrasScan;
+
+  /// Contact id -> names of the groups it belongs to.
+  final Map<String, List<String>> contactGroups;
+
+  const SendPlan(this.files, this.contacts,
+      {this.extras = const {}, this.extrasScan, this.contactGroups = const {}});
+}
+
+/// Where each selected file stands, for the Files tab (compare old phone vs new phone).
+class FileOutcome {
+  final FileEntry file;
+  String status; // waiting | sending | sent | already | cloned | queued | failed
+  String? error;
+  FileOutcome(this.file, this.status);
+
+  bool get onNewPhone => status == 'sent' || status == 'already' || status == 'cloned';
 }
 
 class CategoryTally {
@@ -230,6 +250,20 @@ class SenderService extends ChangeNotifier {
   LaneView? get currentLane => lanes.isEmpty ? null : lanes.values.first;
 
   final List<RecentFile> recent = [];
+
+  /// Every selected file and where it stands (Files tab).
+  final Map<String, FileOutcome> outcomes = {};
+
+  /// Progress of messages, call history, calendar, apps, wallpaper, ringtones (Extras tab).
+  final Map<Extra, ExtraTally> extraTally = {for (final e in Extra.values) e: ExtraTally()};
+  Set<Extra> selectedExtras = {};
+
+  void _outcome(FileEntry f, String status, [String? error]) {
+    final o = outcomes[f.key];
+    if (o == null) return;
+    o.status = status;
+    o.error = error;
+  }
   final List<DlqItem> dlq = [];
   final Map<Category, CategoryTally> tally = {for (final c in Category.values) c: CategoryTally()};
   int contactsTotal = 0, contactsAdded = 0, contactsExisting = 0, contactsFailed = 0;
@@ -496,6 +530,7 @@ class SenderService extends ChangeNotifier {
     if (offset > 0) resumedBytes += offset;
 
     final view = LaneView(f.rel, offset, f.size, resumedFrom: offset);
+    _outcome(f, 'sending');
     lanes[lane] = view;
     _tick(force: true);
 
@@ -617,6 +652,9 @@ class SenderService extends ChangeNotifier {
       dataBytes += files[i].size;
     }
     final view = LaneView(files.first.rel, 0, dataBytes, batch: true, batchCount: files.length);
+    for (final f in files) {
+      _outcome(f, 'sending');
+    }
     lanes[lane] = view;
     _tick(force: true);
 
@@ -786,6 +824,7 @@ class SenderService extends ChangeNotifier {
   }
 
   void _recordSuccess(FileEntry f, String status) {
+    _outcome(f, status == 'saved' ? 'sent' : status);
     if (status == 'saved' || status == 'cloned') {
       tally[f.category]!.sent++;
     } else {
@@ -800,6 +839,7 @@ class SenderService extends ChangeNotifier {
 
   void _toDlq(FileEntry f, String error) {
     dlq.add(DlqItem(f, error));
+    _outcome(f, 'queued', error);
     if (_mainPass) filesProcessed++;
     _tick(force: true);
   }
@@ -903,6 +943,125 @@ class SenderService extends ChangeNotifier {
     return dups;
   }
 
+  // ---------------- extras ----------------
+
+  /// Asks the new phone whether it may restore [e]; the user answers a popup there.
+  Future<bool> _newPhoneReady(Extra e) async {
+    final t = extraTally[e]!;
+    final deadline = DateTime.now().add(const Duration(minutes: 5));
+    while (!_cancel) {
+      await _waitIfPaused();
+      final r = await _requestReliably('POST', '/x/prepare', body: {'kind': e.name}) as Map;
+      if (r['ready'] == true) return true;
+      if (r['denied'] == true || DateTime.now().isAfter(deadline)) {
+        t
+          ..state = 'skipped'
+          ..note = r['denied'] == true ? 'Not allowed on the new phone' : 'No answer on the new phone';
+        return false;
+      }
+      t.state = 'waiting';
+      statusLine = 'On the NEW phone: tap “Allow” to restore ${e.label.toLowerCase()}';
+      _tick(force: true);
+      await _sleep(const Duration(seconds: 2));
+    }
+    return false;
+  }
+
+  Future<void> _sendExtra(Extra e, SendPlan plan) async {
+    final t = extraTally[e]!;
+    final scan = plan.extrasScan;
+    try {
+      if (e.needsNewPhonePermission && !await _newPhoneReady(e)) return;
+      t.state = 'running';
+      statusLine = 'Sending ${e.label.toLowerCase()}…';
+      _tick(force: true);
+      switch (e) {
+        case Extra.calendar:
+          final events = await NativeExtras.readCalendarEvents();
+          t.total = events.length;
+          for (var i = 0; i < events.length && !_cancel; i += 200) {
+            await _waitIfPaused();
+            t.absorb(await _requestReliably('POST', '/x/calendar',
+                body: {'events': events.sublist(i, min(i + 200, events.length))}) as Map);
+            _tick(force: true);
+          }
+        case Extra.calls:
+          t.total = scan?.calls ?? 0;
+          await _sendPages('readCalls', '/x/calls', 500, t);
+        case Extra.messages:
+          t.total = (scan?.sms ?? 0) + (scan?.mms ?? 0);
+          await _sendPages('readSms', '/x/sms', 500, t);
+          await _sendPages('readMms', '/x/mms', 20, t); // pictures make MMS pages heavy
+          await _requestReliably('POST', '/x/messages-done', body: {});
+        case Extra.apps:
+          final apps = scan?.apps ?? const <AppInfo>[];
+          final arrived = [
+            for (final a in apps)
+              if (a.files.every((f) => outcomes[f.key]?.onNewPhone ?? false)) a,
+          ];
+          t.total = apps.length;
+          await _requestReliably('POST', '/x/apps', body: {'apps': [for (final a in arrived) a.toJson()]});
+          t.added = arrived.length;
+          t.failed = apps.length - arrived.length;
+          t.note = 'Install them from the Extras tab on the new phone';
+        case Extra.wallpaper:
+          for (final lock in [false, true]) {
+            final bytes = await NativeExtras.readWallpaper(lock: lock);
+            if (bytes == null || bytes.isEmpty) continue;
+            t.total++;
+            final ok = await _postBytes('/x/wallpaper', {'which': lock ? 'lock' : 'home'}, bytes);
+            ok ? t.added++ : t.failed++;
+          }
+          if (t.total == 0) t.note = 'This phone does not let apps read its wallpaper';
+        case Extra.ringtones:
+          final items = scan?.ringtones ?? const [];
+          t.total = items.length;
+          t.absorb(await _requestReliably('POST', '/x/ringtones', body: {'items': items}) as Map);
+      }
+      t.state = 'done';
+    } on _CancelSignal {
+      rethrow;
+    } on _Busy {
+      rethrow;
+    } catch (err) {
+      t
+        ..state = 'skipped'
+        ..note = _describe(err);
+    } finally {
+      _tick(force: true);
+    }
+  }
+
+  /// Reads records page by page on this phone and sends each page.
+  Future<void> _sendPages(String readMethod, String path, int pageSize, ExtraTally t) async {
+    var after = 0;
+    while (!_cancel) {
+      await _waitIfPaused();
+      final page = await NativeExtras.readPage(readMethod, after, pageSize);
+      final items = page['items'] as List;
+      if (items.isEmpty) break;
+      t.absorb(await _requestReliably('POST', path, body: {'items': items}) as Map);
+      after = (page['last'] as num).toInt();
+      _tick(force: true);
+    }
+  }
+
+  Future<bool> _postBytes(String path, Map<String, String> query, List<int> bytes) async {
+    try {
+      final req = await _client.postUrl(pairing.uri(path, query));
+      req.headers.set('x-code', pairing.code);
+      req.headers.set('x-transfer', _transfer);
+      req.headers.contentType = ContentType.binary;
+      req.contentLength = bytes.length;
+      req.add(bytes);
+      final res = await req.close().timeout(const Duration(seconds: 60));
+      await res.drain<void>();
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ---------------- heartbeat to the new phone ----------------
 
   Map<String, dynamic> _snapshot() => {
@@ -920,6 +1079,7 @@ class SenderService extends ChangeNotifier {
         'speed': bytesPerSecond.round(),
         'lanes': lanes.length,
         'dlq': [for (final d in openDlq.take(200)) d.toJson()],
+        'extras': {for (final e in selectedExtras) e.name: extraTally[e]!.toJson()},
       };
 
   Future<void> _sendHeartbeat() async {
@@ -974,6 +1134,13 @@ class SenderService extends ChangeNotifier {
     fatalError = null;
     receiverReport = null;
     dlq.clear();
+    outcomes
+      ..clear()
+      ..addEntries([for (final f in plan.files) MapEntry(f.key, FileOutcome(f, 'waiting'))]);
+    selectedExtras = Set.of(plan.extras);
+    for (final e in Extra.values) {
+      extraTally[e] = ExtraTally();
+    }
     recent.clear();
     lanes.clear();
     _bigQueue.clear();
@@ -1018,6 +1185,7 @@ class SenderService extends ChangeNotifier {
         tally[f.category]!.selected++;
         if (present.contains(f.key)) {
           tally[f.category]!.already++;
+          _outcome(f, 'already');
         } else {
           toSend.add(f);
         }
@@ -1056,11 +1224,32 @@ class SenderService extends ChangeNotifier {
         final batch = plan.contacts.sublist(i, min(i + 50, plan.contacts.length));
         statusLine = 'Contacts ${i + 1}–${i + batch.length} of ${plan.contacts.length}';
         _tick(force: true);
-        final res = await _requestReliably('POST', '/contacts', body: [for (final c in batch) _portableContact(c)])
-            as Map;
+        final res = await _requestReliably('POST', '/contacts', body: [
+          for (final c in batch)
+            {
+              ..._portableContact(c),
+              if (plan.contactGroups[c.id] != null) 'groupNames': plan.contactGroups[c.id],
+            },
+        ]) as Map;
         contactsAdded += res['added'] as int;
         contactsExisting += res['existing'] as int;
         contactsFailed += res['failed'] as int;
+      }
+      statusLine = null;
+
+      // 3b. Calendar, call history and messages (each needs an OK on the new phone).
+      final extrasOk = receiverVersion >= 5;
+      if (!extrasOk) {
+        for (final e in plan.extras) {
+          extraTally[e]!
+            ..state = 'skipped'
+            ..note = 'Update the new phone to Phone Clone 5 to include this';
+        }
+      } else {
+        for (final e in [Extra.calendar, Extra.calls, Extra.messages]) {
+          if (_cancel || !plan.extras.contains(e)) continue;
+          await _sendExtra(e, plan);
+        }
       }
       statusLine = null;
 
@@ -1170,7 +1359,17 @@ class SenderService extends ChangeNotifier {
       }
       for (final d in failedItems) {
         tally[d.file.category]!.failed++;
+        _outcome(d.file, 'failed', d.lastError);
       }
+
+      // 7. Apps (to reinstall), wallpaper and ringtones, once their files are on the new phone.
+      if (extrasOk) {
+        for (final e in [Extra.apps, Extra.wallpaper, Extra.ringtones]) {
+          if (_cancel || !plan.extras.contains(e)) continue;
+          await _sendExtra(e, plan);
+        }
+      }
+      statusLine = null;
 
       final complete = !_cancel && failedItems.isEmpty;
       try {

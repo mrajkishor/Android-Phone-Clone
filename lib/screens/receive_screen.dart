@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../transfer/extras.dart';
 import '../transfer/native.dart';
 import '../transfer/protocol.dart';
 import '../transfer/receiver.dart';
 import 'permission_gate.dart';
 import 'report_table.dart';
+import 'tab_widgets.dart';
 import 'transfer_widgets.dart';
 
 class ReceiveScreen extends StatelessWidget {
@@ -32,6 +34,36 @@ class _ReceiveBody extends StatefulWidget {
 
 class _ReceiveBodyState extends State<_ReceiveBody> {
   final _service = ReceiverService();
+  Extra? _prompting; // a popup is open for this
+
+  /// The old phone is waiting for an OK here (messages, call history, calendar, ringtones).
+  void _maybePrompt() {
+    final e = _service.pendingPrompt;
+    if (e == null || _prompting != null || !mounted) return;
+    _prompting = e;
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(ExtrasStatusList.iconOf(e)),
+        title: Text('Restore ${e.label.toLowerCase()}?'),
+        content: Text('${e.newPhonePrompt}\n\nNothing already on this phone is changed or removed; '
+            'only missing items are added.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Skip')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Allow')),
+        ],
+      ),
+    ).then((allow) async {
+      await _service.answerPrompt(e, allow == true);
+      _prompting = null;
+      // "Modify system settings" is a switch in Settings: ask again if it is still off.
+      if (_service.pendingPrompt != null) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        _maybePrompt();
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -51,6 +83,9 @@ class _ReceiveBodyState extends State<_ReceiveBody> {
       listenable: _service,
       builder: (context, _) {
         final busy = _service.phase == ReceivePhase.receiving;
+        if (_service.pendingPrompt != null && _prompting == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _maybePrompt());
+        }
         return PopScope(
           canPop: !busy,
           onPopInvokedWithResult: (didPop, _) {
@@ -63,12 +98,118 @@ class _ReceiveBodyState extends State<_ReceiveBody> {
               ReceivePhase.starting => const Center(child: CircularProgressIndicator()),
               ReceivePhase.error => _ErrorView(message: _service.fatalError ?? 'Unknown error'),
               ReceivePhase.waiting => _WaitingView(pairing: _service.pairing!),
-              ReceivePhase.receiving => _ProgressView(service: _service),
-              ReceivePhase.done => _DoneView(service: _service),
+              ReceivePhase.receiving => _tabs(_ProgressView(service: _service)),
+              ReceivePhase.done => _tabs(_DoneView(service: _service)),
             },
           ),
         );
       },
+    );
+  }
+}
+
+extension on _ReceiveBodyState {
+  Widget _tabs(Widget progress) {
+    final s = _service;
+    final rows = [
+      for (final f in s.sessionFiles) FileRow(f.rel, f.size, f.status),
+      for (final f in s.finalFailures) FileRow('${f['rel']}', 0, 'failed', '${f['error']}'),
+    ];
+    final fromOld = ((s.sender['extras'] as Map?) ?? const {}).keys.toSet();
+    final shown = [
+      for (final e in Extra.values)
+        if (fromOld.contains(e.name) || s.extraTally[e]!.state != 'pending') e,
+    ];
+    return TransferTabs(
+      progress: progress,
+      files: FileCompareList(
+        rows: rows,
+        note: s.alreadyBeforeStart > 0
+            ? 'Files that arrived in this transfer. ${s.alreadyBeforeStart} more were already here and were not sent again.'
+            : 'Files that arrived in this transfer.',
+      ),
+      extras: ExtrasStatusList(tally: s.extraTally, shown: shown, footer: [
+        if (s.smsRoleToHandBack)
+          Card(
+            color: Theme.of(context).colorScheme.tertiaryContainer,
+            child: ListTile(
+              leading: const Icon(Icons.sms),
+              title: const Text('Messages restored'),
+              subtitle: const Text('Make your usual messaging app the default SMS app again.'),
+              trailing: FilledButton(onPressed: s.handBackSmsRole, child: const Text('Switch back')),
+            ),
+          ),
+        if (s.apps.isNotEmpty) _AppsCard(service: s),
+        if (s.whatsappBackup)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.chat),
+              title: Text('WhatsApp backup copied'),
+              subtitle: Text('Install WhatsApp from the Play Store, verify your number and tap “Restore” '
+                  'when it offers the local backup.'),
+              isThreeLine: true,
+            ),
+          ),
+      ]),
+      extrasBadge: (s.pendingPrompt != null ? 1 : 0) + s.apps.where((a) => a.state == 'ready').length,
+    );
+  }
+}
+
+class _AppsCard extends StatelessWidget {
+  final ReceiverService service;
+  const _AppsCard({required this.service});
+
+  @override
+  Widget build(BuildContext context) {
+    final apps = service.apps;
+    final todo = apps.where((a) => a.state == 'ready' || a.state == 'failed').toList();
+    return Card(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ListTile(
+          leading: const Icon(Icons.apps),
+          title: Text('${apps.length} apps to install'),
+          subtitle: const Text('Android asks you to confirm each one. App data and logins are not included; '
+              'apps from the Play Store keep updating from there.'),
+          isThreeLine: true,
+        ),
+        if (todo.length > 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: FilledButton.icon(
+              onPressed: () async {
+                for (final a in todo) {
+                  await service.installApp(a);
+                }
+              },
+              icon: const Icon(Icons.download_for_offline),
+              label: Text('Install all ${todo.length}'),
+            ),
+          ),
+        for (final a in apps)
+          ListTile(
+            dense: true,
+            title: Text(a.label),
+            subtitle: Text([
+              if (a.versionName != null) 'v${a.versionName}',
+              if (a.fromPlay) 'from Play Store',
+              if (a.message != null && a.state == 'failed') a.message!,
+            ].join(' • ')),
+            trailing: switch (a.state) {
+              'installed' => const Icon(Icons.check_circle, color: Colors.green),
+              'installing' => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              _ => Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (a.fromPlay)
+                    IconButton(
+                      tooltip: 'Open in Play Store',
+                      icon: const Icon(Icons.shop),
+                      onPressed: () => NativeExtras.openPlayStore(a.package),
+                    ),
+                  TextButton(onPressed: () => service.installApp(a), child: Text(a.state == 'failed' ? 'Retry' : 'Install')),
+                ]),
+            },
+          ),
+      ]),
     );
   }
 }
@@ -333,6 +474,9 @@ class _DoneView extends StatelessWidget {
             if (s.tally[c]!.saved + s.tally[c]!.already > 0) (c.label, s.tally[c]!.saved, s.tally[c]!.already, 0),
           if (s.contactsAdded + s.contactsExisting + s.contactsFailed > 0)
             ('Contacts', s.contactsAdded, s.contactsExisting, s.contactsFailed),
+          for (final e in Extra.values)
+            if (s.extraTally[e]!.state != 'pending')
+              (e.label, s.extraTally[e]!.added, s.extraTally[e]!.existing, s.extraTally[e]!.failed),
         ]),
         if (s.alreadyBeforeStart > 0)
           Padding(

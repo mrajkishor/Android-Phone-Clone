@@ -9,7 +9,9 @@ import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 
+import 'extras.dart';
 import 'native.dart';
 import 'protocol.dart';
 
@@ -19,6 +21,27 @@ class ReceiveTally {
   int saved = 0;
   int already = 0;
   int failed = 0;
+}
+
+/// An app the old phone sent, ready to install from the Extras tab.
+class ReceivedApp {
+  final String package;
+  final String label;
+  final String? versionName;
+  final int versionCode;
+  final bool fromPlay;
+  final List<String> paths; // APK files on this phone
+  String state = 'ready'; // ready | installing | installed | failed
+  String? message;
+  ReceivedApp(this.package, this.label, this.versionName, this.versionCode, this.fromPlay, this.paths);
+}
+
+/// One file of this session, for the Files tab.
+class SessionFile {
+  final String rel;
+  final int size;
+  final String status; // saved | already | cloned
+  SessionFile(this.rel, this.size, this.status);
 }
 
 class ReceivedFile {
@@ -196,6 +219,22 @@ class ReceiverService extends ChangeNotifier {
   List<Map> finalFailures = const [];
 
   Set<String>? _contactKeys;
+
+  /// Files of this session in arrival order (Files tab).
+  final List<SessionFile> sessionFiles = [];
+  final Map<String, String> _pathByRel = {}; // rel on the old phone -> where it was saved here
+
+  /// Messages, call history, calendar, apps, wallpaper, ringtones (Extras tab).
+  final Map<Extra, ExtraTally> extraTally = {for (final e in Extra.values) e: ExtraTally()};
+  final Map<Extra, String> _permission = {}; // asking | granted | denied
+
+  /// The old phone is waiting for an OK on this phone (the screen shows a popup).
+  Extra? pendingPrompt;
+  final List<ReceivedApp> apps = [];
+  bool whatsappBackup = false;
+
+  /// Messages were restored while this app was the default SMS app: offer to switch back.
+  bool smsRoleToHandBack = false;
 
   int get savedTotal => tally.values.fold(0, (s, t) => s + t.saved);
   int get alreadyTotal => tally.values.fold(0, (s, t) => s + t.already) + alreadyBeforeStart;
@@ -431,6 +470,7 @@ class ReceiverService extends ChangeNotifier {
       return;
     }
     if (!readOnly) _lastSenderContact = DateTime.now();
+    final v5 = debugProtocolVersion >= 5;
     if (path == '/hello') {
       addressChanged = false; // the old phone has the current address
       _activeTransfer = transfer;
@@ -497,6 +537,27 @@ class ReceiverService extends ChangeNotifier {
           } else {
             reply = {'status': result};
           }
+        case '/x/prepare' when v5:
+          reply = await _prepare(Extra.values.byName((await _json(req) as Map)['kind'] as String));
+        case '/x/calendar' when v5:
+          reply = await _writeExtra(Extra.calendar, 'writeCalendar', {'events': (await _json(req) as Map)['events']});
+        case '/x/calls' when v5:
+          reply = await _writeExtra(Extra.calls, 'writeCalls', {'items': (await _json(req) as Map)['items']});
+        case '/x/sms' when v5:
+          reply = await _writeExtra(Extra.messages, 'writeSms', {'items': (await _json(req) as Map)['items']});
+        case '/x/mms' when v5:
+          reply = await _writeExtra(Extra.messages, 'writeMms', {'items': (await _json(req) as Map)['items']});
+        case '/x/messages-done' when v5:
+          await req.drain<void>();
+          extraTally[Extra.messages]!.state = 'done';
+          smsRoleToHandBack = await NativeExtras.isDefaultSmsApp();
+          reply = {'ok': true};
+        case '/x/apps' when v5:
+          reply = _receiveApps(((await _json(req) as Map)['apps'] as List).cast<Map>());
+        case '/x/wallpaper' when v5:
+          reply = await _receiveWallpaper(req);
+        case '/x/ringtones' when v5:
+          reply = await _receiveRingtones(((await _json(req) as Map)['items'] as List).cast<Map>());
         case '/done':
           final body = await _json(req) as Map;
           senderCancelled = body['cancelled'] == true;
@@ -556,6 +617,13 @@ class ReceiverService extends ChangeNotifier {
     for (final t in tally.values) {
       t.saved = t.already = t.failed = 0;
     }
+    sessionFiles.clear();
+    for (final e in Extra.values) {
+      extraTally[e] = ExtraTally();
+    }
+    pendingPrompt = null;
+    apps.clear();
+    whatsappBackup = false;
   }
 
   // ---------------- single files (resumable) ----------------
@@ -770,6 +838,7 @@ class ReceiverService extends ChangeNotifier {
       if (await part.exists()) await part.delete();
       tally[category]!.already++;
       filesProcessed++;
+      _noteFile(rel, known.path, size, 'already');
       return 'already';
     }
     try {
@@ -782,6 +851,7 @@ class ReceiverService extends ChangeNotifier {
         tally[category]!.already++;
       }
       filesProcessed++;
+      _noteFile(rel, path, size, status);
       recent.insert(0, ReceivedFile(safe, size, status != 'saved'));
       if (recent.length > 6) recent.removeLast();
       return status;
@@ -845,6 +915,198 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
+  void _noteFile(String rel, String path, int size, String status) {
+    _pathByRel[rel] = path;
+    if (sessionFiles.length < 50000) sessionFiles.add(SessionFile(rel, size, status));
+    if (isWhatsAppBackup(rel)) whatsappBackup = true;
+  }
+
+  // ---------------- extras ----------------
+
+  /// Is this phone allowed to restore [e]? Checked live, so a permission given in
+  /// Settings (e.g. "Modify system settings") counts as soon as the user returns.
+  static Future<bool> extraAllowed(Extra e) async {
+    try {
+      return switch (e) {
+        Extra.messages => await NativeExtras.isDefaultSmsApp(),
+        Extra.calls => await ph.Permission.phone.isGranted,
+        Extra.calendar => await ph.Permission.calendarFullAccess.isGranted,
+        Extra.ringtones => await NativeExtras.canWriteSettings(),
+        Extra.apps || Extra.wallpaper => true,
+      };
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> _prepare(Extra e) async {
+    if (await extraAllowed(e)) {
+      _permission[e] = 'granted';
+      if (pendingPrompt == e) pendingPrompt = null;
+      return {'ready': true};
+    }
+    if (_permission[e] == 'denied') return {'denied': true};
+    _permission[e] = 'asking';
+    pendingPrompt = e;
+    extraTally[e]!.state = 'waiting';
+    return {'ready': false};
+  }
+
+  /// The user answered the popup on this phone.
+  Future<void> answerPrompt(Extra e, bool allow) async {
+    if (!allow) {
+      _permission[e] = 'denied';
+      extraTally[e]!
+        ..state = 'skipped'
+        ..note = 'Not allowed on this phone';
+      pendingPrompt = null;
+      _tick(force: true);
+      return;
+    }
+    try {
+      switch (e) {
+        case Extra.messages:
+          await NativeExtras.requestDefaultSmsApp();
+        case Extra.calls:
+          await ph.Permission.phone.request();
+        case Extra.calendar:
+          await ph.Permission.calendarFullAccess.request();
+        case Extra.ringtones:
+          await NativeExtras.openWriteSettings(); // the user flips the switch and comes back
+        case Extra.apps || Extra.wallpaper:
+          break;
+      }
+    } catch (_) {}
+    if (await extraAllowed(e)) {
+      _permission[e] = 'granted';
+      pendingPrompt = null;
+    } else if (e != Extra.ringtones) {
+      _permission[e] = 'denied';
+      pendingPrompt = null;
+      extraTally[e]!
+        ..state = 'skipped'
+        ..note = 'Permission not given on this phone';
+    }
+    _tick(force: true);
+  }
+
+  Future<Map<String, dynamic>> _writeExtra(Extra e, String method, Map<String, Object?> args) async {
+    final t = extraTally[e]!..state = 'running';
+    final items = (args.values.first as List?)?.length ?? 0;
+    try {
+      final r = await NativeExtras.write(method, args);
+      t
+        ..total += items
+        ..absorb(r);
+      return r;
+    } catch (err) {
+      t
+        ..total += items
+        ..failed += items
+        ..note = '$err';
+      return {'added': 0, 'existing': 0, 'failed': items};
+    } finally {
+      _tick(force: true);
+    }
+  }
+
+  Map<String, dynamic> _receiveApps(List<Map> list) {
+    apps.clear();
+    for (final a in list) {
+      final paths = [
+        for (final rel in (a['files'] as List).cast<String>())
+          if (_pathByRel[rel] != null) _pathByRel[rel]!,
+      ];
+      if (paths.isEmpty) continue;
+      apps.add(ReceivedApp(a['package'] as String, a['label'] as String? ?? a['package'] as String,
+          a['versionName'] as String?, (a['versionCode'] as num? ?? 0).toInt(), a['fromPlay'] == true, paths));
+    }
+    extraTally[Extra.apps]!
+      ..total = list.length
+      ..added = apps.length
+      ..failed = list.length - apps.length
+      ..state = 'done'
+      ..note = 'Tap Install in the Extras tab';
+    _refreshInstalled();
+    return {'added': apps.length, 'existing': 0, 'failed': list.length - apps.length};
+  }
+
+  Future<void> _refreshInstalled() async {
+    for (final a in apps) {
+      try {
+        final v = await NativeExtras.installedVersion(a.package);
+        if (v >= a.versionCode && v >= 0) a.state = 'installed';
+      } catch (_) {}
+    }
+    _tick(force: true);
+  }
+
+  /// Installs one received app (Android asks the user to confirm).
+  Future<void> installApp(ReceivedApp a) async {
+    if (!await NativeExtras.canInstallApps()) {
+      await NativeExtras.openInstallPermission();
+      return;
+    }
+    a.state = 'installing';
+    _tick(force: true);
+    final (ok, msg) = await NativeExtras.installApks(a.paths);
+    a
+      ..state = ok ? 'installed' : 'failed'
+      ..message = msg;
+    _tick(force: true);
+  }
+
+  Future<Map<String, dynamic>> _receiveWallpaper(HttpRequest req) async {
+    final which = req.uri.queryParameters['which'] == 'lock' ? 'lock' : 'home';
+    final bytes = await req.fold<BytesBuilder>(BytesBuilder(copy: false), (b, d) => b..add(d)).then((b) => b.takeBytes());
+    final t = extraTally[Extra.wallpaper]!
+      ..state = 'running'
+      ..total += 1;
+    try {
+      // Keep a copy, so the new phone's own wallpaper can be picked again later.
+      final f = File(p.join(_root.path, 'Pictures', 'PhoneClone', 'wallpaper-$which.png'));
+      await f.parent.create(recursive: true);
+      await f.writeAsBytes(bytes);
+      _queueScan(f.path);
+      final ok = await NativeExtras.setWallpaper(bytes, lock: which == 'lock');
+      ok ? t.added++ : t.failed++;
+      t.state = 'done';
+      return {'ok': ok};
+    } catch (e) {
+      t.failed++;
+      t.note = '$e';
+      return {'ok': false};
+    } finally {
+      _tick(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _receiveRingtones(List<Map> items) async {
+    final t = extraTally[Extra.ringtones]!
+      ..state = 'running'
+      ..total = items.length;
+    for (final r in items) {
+      try {
+        final rel = r['rel'] as String?;
+        final ok = await NativeExtras.setRingtone(
+            r['type'] as String, rel == null ? null : _pathByRel[rel], r['title'] as String?);
+        ok ? t.added++ : t.failed++;
+      } catch (_) {
+        t.failed++;
+      }
+    }
+    t.state = 'done';
+    _tick(force: true);
+    return {'added': t.added, 'existing': 0, 'failed': t.failed};
+  }
+
+  /// Gives the SMS role back to the user's own messaging app.
+  Future<void> handBackSmsRole() async {
+    await NativeExtras.restoreDefaultSmsApp();
+    smsRoleToHandBack = false;
+    _tick(force: true);
+  }
+
   // ---------------- contacts ----------------
 
   static Iterable<String> _keysOf(Contact c) sync* {
@@ -869,6 +1131,13 @@ class ReceiverService extends ChangeNotifier {
     }
   }
 
+  Map<String, String>? _groupIds; // group name -> id on this phone
+
+  Future<String> _groupId(String name) async {
+    _groupIds ??= {for (final g in await FlutterContacts.groups.getAll()) g.name: g.id!};
+    return _groupIds![name] ??= (await FlutterContacts.groups.create(name)).id!;
+  }
+
   Future<Map<String, int>> _importContacts(List<Map> batch) async {
     if (_contactKeys == null) {
       final status = await FlutterContacts.permissions.request(PermissionType.readWrite);
@@ -883,17 +1152,25 @@ class ReceiverService extends ChangeNotifier {
       _contactKeys = {for (final c in existing) ..._keysOf(c)};
     }
     var added = 0, existing = 0, failed = 0;
-    for (final json in batch) {
+    for (final raw in batch) {
       try {
+        final json = Map<String, dynamic>.from(raw)..remove('groupNames');
+        final groups = (raw['groupNames'] as List?)?.cast<String>() ?? const [];
         final contact = Contact.fromJson(json);
         final keys = _keysOf(contact).toList();
         if (keys.isNotEmpty && keys.any(_contactKeys!.contains)) {
           existing++;
           continue;
         }
-        await FlutterContacts.create(contact);
+        final id = await FlutterContacts.create(contact);
         _contactKeys!.addAll(keys);
         added++;
+        for (final g in groups) {
+          try {
+            final gid = await _groupId(g);
+            await FlutterContacts.groups.addContacts(groupId: gid, contactIds: [id]);
+          } catch (_) {}
+        }
       } catch (e) {
         failed++;
         errors.add('Contact: $e');

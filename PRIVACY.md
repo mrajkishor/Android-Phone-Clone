@@ -1,6 +1,6 @@
 # Privacy Policy — Phone Clone
 
-**Effective date:** 8 November 2026
+**Effective date:** 8 November 2026 (updated for version 5.0.0)
 **App:** Phone Clone (Android), package `com.mrajkishor.phoneclone`
 **Developer:** [@mrajkishor](https://github.com/mrajkishor)
 
@@ -20,6 +20,11 @@ Phone Clone copies your data from your old Android phone to your new Android pho
 | Music and audio files | To copy them to your new phone | Your new phone only |
 | Documents and other files on your phone's storage | To copy them to your new phone, in the same folders | Your new phone only |
 | Contacts (names, phone numbers, emails, addresses, notes, photos and other contact fields) | To copy them to your new phone, skipping ones already there | Your new phone only |
+| Messages (SMS and MMS, with attachments) | To copy them to your new phone. On the new phone the app is the default SMS app only while it writes them; while it is, any incoming SMS is saved to your inbox as usual | Your new phone only |
+| Call history | To copy it to your new phone | Your new phone only |
+| Calendar events stored on the phone | To copy them to your new phone | Your new phone only |
+| List of installed apps and their installer (APK) files | To reinstall the same apps on your new phone after you confirm | Your new phone only |
+| Wallpaper and ringtone settings | To set the same wallpaper and sounds on your new phone | Your new phone only |
 | Camera | Only to scan the pairing QR code shown on the new phone. No photos are taken or saved | Nowhere: the image is processed on the device and discarded |
 | Local network information (your phone's local IP address) | So the two phones can find each other | Shown on the new phone's screen and QR code |
 
@@ -33,7 +38,7 @@ The app transfers only the categories **you** switch on, and only after **you** 
 
 ## What is stored, and where
 
-- **On the new phone:** the files and contacts you transferred, plus a small record of which files were received. This record is used to skip files that are already there and to resume interrupted transfers. Partly received files are kept in a hidden folder (`.phonetransfer_tmp`) until the transfer completes.
+- **On the new phone:** the files, contacts, messages, call history, calendar events, apps, wallpaper and ringtones you chose to transfer, plus a small record of which files were received. This record is used to skip files that are already there and to resume interrupted transfers. Partly received files are kept in a hidden folder (`.phonetransfer_tmp`) until the transfer completes.
 - **On the old phone:** a small record of the last unfinished transfer (the new phone's local address, the pairing code and the categories you chose), so you can continue with one tap. It's deleted when a transfer completes.
 - All of this stays on your phones. You can remove it at any time by clearing the app's storage or uninstalling the app.
 

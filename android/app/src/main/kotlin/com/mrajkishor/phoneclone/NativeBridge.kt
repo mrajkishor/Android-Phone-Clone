@@ -16,6 +16,7 @@ import java.io.File
 /** The "phone_transfer/native" channel. Lives with the engine, not the screen. */
 class NativeBridge(private val ctx: Context) {
     private val main = Handler(Looper.getMainLooper())
+    private val extras = ExtrasBridge(ctx)
 
     fun register(engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, "phone_transfer/native")
@@ -92,7 +93,7 @@ class NativeBridge(private val ctx: Context) {
                         result.success(null)
                     }
 
-                    else -> result.notImplemented()
+                    else -> if (!extras.handle(call, result)) result.notImplemented()
                 }
             }
     }

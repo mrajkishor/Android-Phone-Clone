@@ -20,7 +20,7 @@
 </div>
 
 > [!TIP]
-> **Newest build: Phone Clone 4.2.2** → [`apk/PhoneClone-v4.2.2.apk`](apk/PhoneClone-v4.2.2.apk). This is the Google Play edition (package `com.mrajkishor.phoneclone`), with one-tap reconnect after a dropped connection. It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
+> **Newest build: Phone Clone 5.0.0** → [`apk/PhoneClone-v5.0.0.apk`](apk/PhoneClone-v5.0.0.apk). Now also moves **messages, call history, calendar, installed apps, wallpaper and ringtones**, with new **Files** and **Extras** tabs to compare the old phone with the new one. This is the Google Play edition (package `com.mrajkishor.phoneclone`). It installs as a **separate app** from the older *Phone Transfer* v3/v4 APKs. Play launch kit: [`docs/play-store/`](docs/play-store/).
 
 ---
 
@@ -250,10 +250,18 @@ The app shows which mode it's in while sending.
 | 🎞️ **Other media** | Pictures, videos and audio the gallery doesn't show | ✅ |
 | 📁 **Other files** | Anything else on internal storage or an SD card | ✅ |
 | 🙈 **Hidden files** | Files in hidden folders — mostly caches and thumbnails | ⬜ |
-| 👤 **Contacts** | All fields + full-size photos; existing contacts skipped | ✅ |
+| 👤 **Contacts** | All fields + full-size photos, **with their groups**; existing contacts skipped | ✅ |
+| 💬 **Messages** *(v5)* | SMS and MMS with pictures. Phone Clone is briefly the default SMS app on the new phone, then you switch back | ✅ |
+| 📞 **Call history** *(v5)* | Number, date, duration, type | ✅ |
+| 📅 **Calendar** *(v5)* | Events stored on the phone (Google / Outlook ones return when you sign in) | ✅ |
+| 📲 **Installed apps** *(v5)* | APKs copied, installed from the **Extras** tab (you confirm each). No app data | ✅ |
+| 🖼️ **Wallpaper** *(v5)* | Home and lock screen | ✅ |
+| 🔔 **Ringtones** *(v5)* | Ringtone, notification and alarm sound | ✅ |
+
+> Permissions are asked in popups only when needed: on the old phone during the scan, on the new phone during the transfer (*Allow* / *Skip*). Nothing already on the new phone is removed; messages, calls and events are de-duplicated.
 
 <details>
-<summary><b>❌ What can't be transferred (and why)</b></summary>
+<summary><b>❌ What still can't be transferred (and why)</b></summary>
 
 <br>
 
@@ -261,10 +269,9 @@ Android reserves these for system tools such as Google's setup restore or Samsun
 
 | Not transferred | Alternative |
 |---|---|
-| Installed apps and their data | Google account restore during phone setup |
-| SMS / MMS, call history | Google One backup, or your phone maker's tool |
-| WhatsApp & other in-app chat histories | The app's own backup (e.g. WhatsApp → Chats → Chat backup) |
-| Wi-Fi passwords, settings, wallpapers | Google account restore |
+| App data and logins (inside apps) | Each app's own backup / sign in again; Google account restore |
+| WhatsApp & other in-app chat histories | Make a local backup first (WhatsApp → Chats → Chat backup); Phone Clone copies it, then tap *Restore* in WhatsApp |
+| Wi-Fi passwords, system settings | Google account restore |
 | `Android/data` and `Android/obb` folders | Private to each app by design |
 
 </details>
@@ -535,6 +542,11 @@ Contacts use their own check: phone numbers (last 10 digits), email addresses, o
 | Notifications | both | Show progress while running in the background |
 | Foreground service, wake lock | both | Keep the transfer running with the screen off |
 | Network / Wi-Fi state | both | Local connection between the phones |
+| SMS, default SMS app *(v5)* | old reads / new writes | Messages. Writing needs Phone Clone to be the default SMS app for a moment |
+| Call log *(v5)* | both | Call history |
+| Calendar *(v5)* | both | Calendar events |
+| Install apps *(v5)* | new | Reinstall the old phone's apps (Android asks to confirm each) |
+| Wallpaper, modify system settings *(v5)* | new | Set wallpaper and ringtones |
 
 ---
 
@@ -596,7 +608,7 @@ The release APK is signed with the debug key, which is fine for sideloading. Set
 
 ```bash
 flutter test
-# 00:15 +12: All tests passed!
+# 00:17 +13: All tests passed!
 ```
 
 ---
@@ -642,7 +654,8 @@ apk/PhoneTransfer-v4.0.0.apk        # Ready-to-install build (v3.0.0 kept alongs
 
 | Version | Theme | Highlights | ⏱️ Build time |
 |---|---|---|:---:|
-| **v4.2.2** · *newest build* | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
+| **v5.0.0** · *newest build* | Everything | Messages, call history, calendar, installed apps, wallpaper, ringtones, contact groups, WhatsApp guidance; **Progress / Files / Extras** tabs on both phones | **~45 min** |
+| v4.2.2 | Fix | One transfer at a time on the new phone; progress never flickers or goes backwards | **~15 min** |
 | v4.2.1 | Fix | *Looking for identical files* shows real progress and can be skipped | **~5 min** |
 | v4.2.0 | Reconnect | New phone shows its address and a **Show QR** button; *Connection lost* view with a fresh QR; *Continue* falls back to the scanner | **~10 min** |
 | v4.1.0 | Play-ready | Renamed **Phone Clone** (`com.mrajkishor.phoneclone`), upload-key signing, new icon, privacy policy, Play launch kit | **~16 min** |
@@ -913,7 +926,9 @@ v4 works with v3 phones in compatibility mode. This message only appears with mu
 ## ⚠️ Known limitations
 
 - Android 15 limits this kind of background service to **6 hours per day**.
-- Fast mode needs **v4 on both phones**; with a v3 phone, files go one at a time.
+- Fast mode needs **v4 on both phones**; with a v3 phone, files go one at a time. Extras (messages, calls, …) need **v5 on both phones**.
+- Reinstalled apps start fresh: app data and logins are not included (Android doesn't allow it).
+- On Android 10+, handing the SMS role back goes through *Settings → Default apps*, which the **Switch back** button opens.
 - Plain HTTP on the local network, protected by the pairing code only. There's no end-to-end encryption yet.
 - A file that changes after the scan (e.g. still downloading) is reported as failed. Scan again to include the new version.
 - Background running and automatic reconnect are designed for real devices and have **not been tested** on physical phones in the automated suite.

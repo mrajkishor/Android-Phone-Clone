@@ -43,6 +43,25 @@ While a phone-to-phone transfer is running, Phone Clone runs a dataSync foregrou
 
 ---
 
+## 2b. SMS and call log (`READ_SMS`, `SEND_SMS`, `RECEIVE_SMS`, `RECEIVE_MMS`, `RECEIVE_WAP_PUSH`, `READ_CALL_LOG`, `WRITE_CALL_LOG`)
+
+*Play Console → Policy → App content → Sensitive permissions → SMS and Call Log*
+
+| Question | Answer |
+|---|---|
+| Core functionality | **Backup and restore for users** (also fits *Device migration / phone transfer*) |
+| Description | *Phone Clone copies the user's own messages and call history from their old phone to their new phone, over their local Wi-Fi, when the user turns on "Messages" or "Call history" and starts a transfer. On the new phone the app asks to become the default SMS app only while it writes the messages, then helps the user switch back. Nothing is sent to any server.* |
+| Default SMS handler | Requested temporarily on the new phone (`RoleManager.ROLE_SMS`) |
+| Video | Old phone: choose *Messages* → transfer. New phone: *Allow* popup → default-SMS prompt → messages appear → *Switch back* |
+
+## 2c. Install apps (`REQUEST_INSTALL_PACKAGES`)
+
+| Question | Answer |
+|---|---|
+| Use case | **Device migration / phone transfer**: reinstall the apps the user had on the old phone from their APKs, after the user taps *Install* (Android confirms each one) |
+
+Package visibility uses a `<queries>` element for launcher apps only (no `QUERY_ALL_PACKAGES`).
+
 ## 3. Data safety
 
 *Play Console → Policy → App content → Data safety*
@@ -63,8 +82,12 @@ Data types to declare as **Collected** (not *Shared*):
 | Audio files | Music files, Other audio files | ✅ | ❌ | No | Optional | App functionality |
 | Files and docs | Files and docs | ✅ | ❌ | No | Optional | App functionality |
 | Contacts | Contacts | ✅ | ❌ | No | Optional | App functionality |
+| Messages | SMS or MMS | ✅ | ❌ | No | Optional | App functionality |
+| App activity | Other user-generated content *(call history)* | ✅ | ❌ | No | Optional | App functionality |
+| Calendar | Calendar events | ✅ | ❌ | No | Optional | App functionality |
+| App info and performance | Other app info *(installed apps list and APKs)* | ✅ | ❌ | No | Optional | App functionality |
 
-Not collected: location, personal info, financial info, health, messages, calendar, app activity, web browsing, app info and performance, device or other IDs.
+Not collected: location, personal info, financial info, health, web browsing, device or other IDs.
 
 > **Worth improving later:** Data that is end-to-end encrypted, so only sender and recipient can read it, doesn't have to be declared at all. Adding encryption to the transfer (keyed from the QR pairing) would let the listing say **"No data collected"** and **"Data is encrypted in transit"**.
 
@@ -85,3 +108,4 @@ Not collected: location, personal info, financial info, health, messages, calend
 | **Health** | No health features |
 | **Camera permission** | Used only to scan the pairing QR code |
 | **Contacts permission** | Read on the old phone, write on the new phone, solely to transfer the user's own contacts |
+| **Calendar permission** | Read on the old phone, write on the new phone, solely to transfer the user's own events |

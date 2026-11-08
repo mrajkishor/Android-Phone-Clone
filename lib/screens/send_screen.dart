@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
+import '../transfer/extras.dart';
 import '../transfer/native.dart';
 import '../transfer/protocol.dart';
 import '../transfer/scanner.dart';
@@ -9,6 +12,7 @@ import '../transfer/session_store.dart';
 import 'permission_gate.dart';
 import 'report_table.dart';
 import 'scan_screen.dart';
+import 'tab_widgets.dart';
 import 'transfer_widgets.dart';
 
 class SendScreen extends StatelessWidget {
@@ -45,6 +49,8 @@ class _SendBodyState extends State<_SendBody> {
   List<Contact> _contacts = [];
   final Set<Category> _selected = {for (final c in Category.values) if (c.onByDefault) c};
   bool _sendContacts = true;
+  ExtrasScan? _extras;
+  final Set<Extra> _selectedExtras = {};
   SendPlan? _plan;
   LastSession? _last; // an unfinished transfer that can be continued
 
@@ -120,6 +126,11 @@ class _SendBodyState extends State<_SendBody> {
       await StoragePermission.requestMediaRead();
       _contacts = await SenderService.loadContacts();
       _scan = await scanDevice();
+      // Messages, calls, calendar (each asks for permission here), apps, wallpaper, ringtones.
+      _extras = await ExtrasScan.scan(await Native.storageRoots());
+      _selectedExtras
+        ..clear()
+        ..addAll([for (final e in Extra.values) if (_extras!.count(e) > 0) e]);
     } catch (e) {
       setState(() {
         _step = _Step.connect;
@@ -131,14 +142,41 @@ class _SendBodyState extends State<_SendBody> {
     return true;
   }
 
-  void _start() {
+  Future<void> _start() async {
     final files = [for (final c in _selected) ..._scan!.byCategory[c]!];
     final contacts = _sendContacts ? _contacts : <Contact>[];
-    if (files.isEmpty && contacts.isEmpty) {
+    final extras = Set.of(_selectedExtras);
+    if (files.isEmpty && contacts.isEmpty && extras.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nothing selected.')));
       return;
     }
-    _plan = SendPlan(files, contacts);
+    // Apps and ringtones travel as files first; the new phone installs / sets them afterwards.
+    final keys = {for (final f in files) f.key};
+    void addFile(FileEntry f) {
+      if (keys.add(f.key)) files.add(f);
+    }
+
+    final x = _extras;
+    if (x != null && extras.contains(Extra.apps)) {
+      for (final a in x.apps) {
+        a.files.forEach(addFile);
+      }
+    }
+    if (x != null && extras.contains(Extra.ringtones)) {
+      for (final r in x.ringtones) {
+        final path = r['path'] as String?, rel = r['rel'] as String?;
+        if (path == null || rel == null) continue;
+        try {
+          final st = File(path).statSync();
+          if (st.type == FileSystemEntityType.file) {
+            addFile(FileEntry(path, rel, st.size, st.modified.millisecondsSinceEpoch, Category.music));
+          }
+        } catch (_) {}
+      }
+    }
+    setState(() => _step = _Step.preparing);
+    final groups = contacts.isEmpty ? const <String, List<String>>{} : await contactGroupNames(contacts);
+    _plan = SendPlan(files, contacts, extras: extras, extrasScan: x, contactGroups: groups);
     setState(() => _step = _Step.transfer);
     _runPlan();
   }
@@ -200,7 +238,7 @@ class _SendBodyState extends State<_SendBody> {
                   ]),
                 ),
               _Step.choose => _buildChoose(),
-              _Step.transfer => _busy || _sender!.phase == SendPhase.idle ? _buildRunning() : _buildResult(),
+              _Step.transfer => _buildTabs(),
             },
           ),
         );
@@ -299,6 +337,28 @@ class _SendBodyState extends State<_SendBody> {
               value: _contacts.isNotEmpty && _sendContacts,
               onChanged: _contacts.isEmpty ? null : (v) => setState(() => _sendContacts = v),
             ),
+            if (_extras != null) ...[
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text('More than files', style: Theme.of(context).textTheme.titleSmall),
+              ),
+              for (final e in Extra.values) _extraSwitch(e),
+              if (_extras!.contactGroups > 0)
+                ListTile(
+                  leading: const Icon(Icons.group_outlined),
+                  title: const Text('Contact groups'),
+                  subtitle: Text('${_extras!.contactGroups} groups, sent with the contacts'),
+                ),
+              const ListTile(
+                leading: Icon(Icons.chat_outlined),
+                title: Text('WhatsApp chats'),
+                subtitle: Text('Before you start, open WhatsApp → Settings → Chats → Chat backup → Back up. '
+                    'The backup is copied with “Other files”; install WhatsApp on the new phone, '
+                    'verify your number and tap Restore.'),
+                isThreeLine: true,
+              ),
+            ],
             if (scan.unreadable > 0)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -318,6 +378,44 @@ class _SendBodyState extends State<_SendBody> {
           child: const Padding(padding: EdgeInsets.all(12), child: Text('Start transfer')),
         ),
       ],
+    );
+  }
+
+  Widget _extraSwitch(Extra e) {
+    final x = _extras!;
+    final why = x.unavailable[e];
+    final n = x.count(e);
+    final hint = e.needsNewPhonePermission ? '\nThe new phone asks you to allow this during the transfer.' : '';
+    return SwitchListTile(
+      secondary: Icon(ExtrasStatusList.iconOf(e)),
+      title: Text(e.label),
+      subtitle: Text(why ?? (n == 0 ? 'Nothing found' : '${x.summary(e)}$hint')),
+      isThreeLine: why == null && n > 0,
+      value: n > 0 && _selectedExtras.contains(e),
+      onChanged: n == 0 ? null : (v) => setState(() => v ? _selectedExtras.add(e) : _selectedExtras.remove(e)),
+    );
+  }
+
+  Widget _buildTabs() {
+    final s = _sender!;
+    final progress = _busy || s.phase == SendPhase.idle ? _buildRunning() : _buildResult();
+    final rows = [
+      for (final o in s.outcomes.values) FileRow(o.file.rel, o.file.size, o.status, o.error),
+    ];
+    final failed = rows.where((r) => r.status == 'failed').length;
+    final waitingExtra = s.extraTally.entries.any((e) => s.selectedExtras.contains(e.key) && e.value.state == 'waiting');
+    return TransferTabs(
+      progress: progress,
+      files: FileCompareList(
+        rows: rows,
+        note: 'Every file you chose on this phone, and whether it is on the new phone now.',
+      ),
+      extras: ExtrasStatusList(
+        tally: s.extraTally,
+        shown: [for (final e in Extra.values) if (s.selectedExtras.contains(e)) e],
+      ),
+      filesBadge: failed,
+      extrasBadge: waitingExtra ? 1 : 0,
     );
   }
 
@@ -513,6 +611,9 @@ class _SendBodyState extends State<_SendBody> {
         for (final c in Category.values)
           if (s.tally[c]!.selected > 0) (c.label, s.tally[c]!.sent, s.tally[c]!.already, s.tally[c]!.failed),
         if (s.contactsTotal > 0) ('Contacts', s.contactsAdded, s.contactsExisting, s.contactsFailed),
+        for (final e in Extra.values)
+          if (s.selectedExtras.contains(e))
+            (e.label, s.extraTally[e]!.added, s.extraTally[e]!.existing, s.extraTally[e]!.failed),
       ]),
       const SizedBox(height: 8),
       if (failed.isNotEmpty) FailedFilesCard(items: [for (final d in failed) (d.file.path, d.lastError)]),

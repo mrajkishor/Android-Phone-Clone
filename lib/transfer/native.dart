@@ -63,6 +63,59 @@ class Native {
   }
 }
 
+/// Messages, call history, calendar, apps, wallpaper and ringtones (ExtrasBridge.kt).
+class NativeExtras {
+  static const _c = MethodChannel('phone_transfer/native');
+
+  static Map<String, dynamic> _map(Object? v) => (v as Map).cast<String, dynamic>();
+  static List<Map<String, dynamic>> _list(Object? v) =>
+      [for (final e in (v as List? ?? const [])) (e as Map).cast<String, dynamic>()];
+
+  // ---- old phone: reading ----
+  static Future<Map<String, dynamic>> counts() async => _map(await _c.invokeMethod('extrasCounts'));
+
+  /// A page of records after record id [after]: {items: [...], last: id}.
+  static Future<Map<String, dynamic>> readPage(String what, int after, int limit) async =>
+      _map(await _c.invokeMethod(what, {'after': after, 'limit': limit}));
+
+  static Future<List<Map<String, dynamic>>> readCalendarEvents() async =>
+      _list(_map(await _c.invokeMethod('readCalendar'))['events']);
+  static Future<List<Map<String, dynamic>>> listApps() async => _list(await _c.invokeMethod('listApps'));
+  static Future<Uint8List?> readWallpaper({required bool lock}) =>
+      _c.invokeMethod<Uint8List>('readWallpaper', {'which': lock ? 'lock' : 'home'});
+  static Future<List<Map<String, dynamic>>> readRingtones() async => _list(await _c.invokeMethod('readRingtones'));
+
+  // ---- new phone: writing ----
+  /// {added, existing, failed}
+  static Future<Map<String, dynamic>> write(String what, Map<String, Object?> args) async =>
+      _map(await _c.invokeMethod(what, args));
+
+  static Future<bool> isDefaultSmsApp() async => await _c.invokeMethod<bool>('isDefaultSmsApp') ?? false;
+  static Future<bool> requestDefaultSmsApp() async => await _c.invokeMethod<bool>('requestDefaultSmsApp') ?? false;
+  static Future<void> restoreDefaultSmsApp() => _c.invokeMethod('restoreDefaultSmsApp');
+
+  static Future<bool> canWriteSettings() async => await _c.invokeMethod<bool>('canWriteSettings') ?? false;
+  static Future<void> openWriteSettings() => _c.invokeMethod('openWriteSettings');
+  static Future<bool> setRingtone(String type, String? path, String? title) async =>
+      await _c.invokeMethod<bool>('setRingtone', {'type': type, 'path': path, 'title': title}) ?? false;
+
+  static Future<bool> setWallpaper(Uint8List bytes, {required bool lock}) async =>
+      await _c.invokeMethod<bool>('setWallpaper', {'bytes': bytes, 'which': lock ? 'lock' : 'home'}) ?? false;
+
+  static Future<int> installedVersion(String package) async =>
+      await _c.invokeMethod<int>('installedVersion', {'package': package}) ?? -1;
+  static Future<bool> canInstallApps() async => await _c.invokeMethod<bool>('canInstallApps') ?? false;
+  static Future<void> openInstallPermission() => _c.invokeMethod('openInstallPermission');
+
+  /// Installs one app; Android shows its own confirmation. Returns (ok, message).
+  static Future<(bool, String?)> installApks(List<String> paths) async {
+    final r = _map(await _c.invokeMethod('installApks', {'paths': paths}));
+    return (r['ok'] == true, r['message'] as String?);
+  }
+
+  static Future<void> openPlayStore(String package) => _c.invokeMethod('openPlayStore', {'package': package});
+}
+
 /// "All files access" is what lets the app see and write every file.
 class StoragePermission {
   static Future<bool> granted() async {

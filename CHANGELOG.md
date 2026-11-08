@@ -5,6 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 | Version | Theme | Protocol | Install over previous? | Build time |
 |---|---|:---:|:---:|:---:|
+| [5.0.0](#500--2026-11-08) | Everything: messages, call history, calendar, apps, wallpaper, ringtones; Files and Extras tabs | 5 (talks 3–4) | ✅ over 4.1+ (Phone Clone) | ~45 min |
 | [4.0.0](#400--2026-11-08) | Fast: parallel lanes, batches, duplicate cloning; works with v3 phones | 4 (talks 3) | ✅ even mid-transfer | ~15 min |
 | [3.0.0](#300--2026-11-08) | Unstoppable: survives timeouts, drops, pauses and the app being closed | 3 | ✅ | ~16 min |
 | [2.0.0](#200--2026-11-08) | Exact: same folders, same dates, verified, no duplicates | 2 | ✅ | ~14 min |
@@ -13,6 +14,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 > v1–v3 each changed the network protocol, so both phones had to match. **v4 also talks to v3 phones** (in either direction), falling back to one file at a time; full speed needs v4 on both.
 
 ---
+
+## [5.0.0] — 2026-11-08
+
+### Added — more than files
+Each is a switch on the old phone's *choose* screen. Anything that needs a permission asks for it in a popup: on the **old phone** when it scans, and on the **new phone** during the transfer (*Allow* / *Skip*).
+- 💬 **Messages (SMS & MMS)**, with MMS pictures. On the new phone, Phone Clone briefly becomes the **default SMS app** (Android requires this to write messages), then offers **Switch back** to your usual messaging app.
+- 📞 **Call history**: number, date, duration, incoming / outgoing / missed.
+- 📅 **Calendar events stored on the phone**, into a calendar called *"… (old phone)"*. Google / Outlook calendars are skipped because they come back when you sign in.
+- 📲 **Installed apps**: each app's APK (with split APKs) is copied, and the new phone's **Extras** tab installs them one by one or *Install all*, plus a Play Store link for Play apps. App data and logins are not included.
+- 🖼️ **Wallpaper** (home and lock), set on the new phone; a copy is kept in `Pictures/PhoneClone/`.
+- 🔔 **Ringtone, notification and alarm sounds**: the sound file is copied and set (needs *Modify system settings* on the new phone).
+- 👥 **Contact groups**: contacts keep their groups (groups are created on the new phone if missing).
+- 💚 **WhatsApp**: guidance to make a local backup first; the new phone confirms when the backup was copied and how to restore it.
+- Nothing already on the new phone is removed or changed: messages, calls and events are de-duplicated against what's there.
+
+### Added — tabs on both phones
+- **Progress**: the existing view.
+- **Files**: every file and where it stands, with filters (*On new phone*, *Copied now*, *Already there*, *Pending*, *Failed*) and search. On the old phone this compares every chosen file with the new phone; on the new phone it lists what arrived.
+- **Extras**: messages, calls, calendar, apps, wallpaper, ringtones with *added / already there / failed*, the *Switch back* button for SMS and the app installer.
+
+### Changed
+- Protocol **5**. A v5 old phone with a v4 new phone sends files and contacts as before and marks extras as *skipped — update the new phone*.
+- New permissions: SMS, call log, calendar, wallpaper, modify system settings, install apps. See [`docs/play-store/declarations.md`](docs/play-store/declarations.md): SMS and call log need a Play **permissions declaration** (*backup and restore* exception).
+- 1 new test covering all extras, the popup and the Files tab (**13 tests**).
 
 ## [4.2.2] — 2026-11-08
 

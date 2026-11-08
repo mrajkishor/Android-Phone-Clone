@@ -11,7 +11,7 @@ const int kDefaultPort = 8765;
 /// Bumped whenever the wire format changes.
 /// v4 adds parallel lanes, small-file batches and duplicate cloning, and still
 /// talks to v3 phones in either direction (falling back to v3 behaviour).
-const int kProtocolVersion = 4;
+const int kProtocolVersion = 5;
 
 /// Oldest protocol this app can still talk to.
 const int kMinProtocolVersion = 3;

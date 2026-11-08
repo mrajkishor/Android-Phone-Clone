@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:phone_transfer/transfer/extras.dart';
 import 'package:phone_transfer/transfer/protocol.dart';
 import 'package:phone_transfer/transfer/receiver.dart';
 import 'package:phone_transfer/transfer/scanner.dart';
@@ -39,6 +41,7 @@ void main() {
   late Directory tmp, oldRoot, newRoot, support;
   String currentRoot = '';
   final scanned = <String>[];
+  Future<Object?> Function(MethodCall call)? extraNative; // native calls a test wants to answer
 
   setUp(() {
     tmp = Directory.systemTemp.createTempSync('pt');
@@ -63,7 +66,7 @@ void main() {
         case 'sdkInt':
           return 34;
         default:
-          return null;
+          return extraNative?.call(call);
       }
     });
 
@@ -91,6 +94,7 @@ void main() {
     ReceiverService.ipLookup = () async => '127.0.0.1';
     ReceiverService.senderSilenceLimit = const Duration(seconds: 15);
     scanned.clear();
+    extraNative = null;
     tmp.deleteSync(recursive: true);
   });
 
@@ -133,10 +137,10 @@ void main() {
     expect(expectedFromSetup, isEmpty);
   });
 
-  test('QR code: a v3 phone can still read it, a v4 phone sees v4', () {
+  test('QR code: a v3 phone can still read it, a newer phone sees the newest version', () {
     final qr = const PairingInfo(host: '10.0.0.2', port: 8765, code: '123456').toQr();
     expect((jsonDecode(qr) as Map)['v'], 3, reason: 'v3 apps only accept v == 3');
-    expect(PairingInfo.fromQr(qr)!.version, 4);
+    expect(PairingInfo.fromQr(qr)!.version, kProtocolVersion);
     // A QR code from a v3 phone.
     final v3 = jsonEncode({'app': 'phone_transfer', 'v': 3, 'host': 'h', 'port': 1, 'code': '000000'});
     expect(PairingInfo.fromQr(v3)!.version, 3);
@@ -465,5 +469,140 @@ void main() {
     s1.dispose();
     s2.dispose();
     await r.stop();
+  });
+
+  test('v5 extras: messages, calls, calendar, apps, wallpaper, ringtone; popup on the new phone; Files tab outcomes',
+      () async {
+    // Answers both phones' native calls (they share one process in tests).
+    var defaultSms = false;
+    final written = <String, List>{};
+    final wallpapers = <String>[];
+    final ringtones = <String?>[];
+    Map page(int after, List<Map> all) {
+      final items = [for (final i in all) if ((i['id'] as int) > after) i];
+      return {'items': items, 'last': items.isEmpty ? after : items.last['id']};
+    }
+
+    final sms = [
+      {'id': 1, 'address': '+911', 'body': 'hi', 'date': 1, 'type': 1},
+      {'id': 2, 'address': '+912', 'body': 'yo', 'date': 2, 'type': 2},
+    ];
+    final calls = [
+      {'id': 1, 'number': '+911', 'date': 10, 'duration': 5, 'type': 1},
+      {'id': 2, 'number': '+913', 'date': 11, 'duration': 0, 'type': 3},
+    ];
+    extraNative = (call) async {
+      final a = (call.arguments as Map?) ?? const {};
+      Map wrote(String k) {
+        final items = (a['items'] ?? a['events']) as List;
+        written.putIfAbsent(k, () => []).addAll(items);
+        return {'added': items.length, 'existing': 0, 'failed': 0};
+      }
+
+      return switch (call.method) {
+        'extrasCounts' => {'sms': 2, 'mms': 0, 'calls': 2, 'calendarEvents': 1},
+        'readSms' => page(a['after'] as int, sms),
+        'readMms' => page(a['after'] as int, const []),
+        'readCalls' => page(a['after'] as int, calls),
+        'readCalendar' => {
+            'events': [
+              {'title': 'Birthday', 'dtstart': 100, 'dtend': 200},
+            ],
+          },
+        'listApps' => [
+            {
+              'package': 'com.example.x',
+              'label': 'X',
+              'versionName': '1.0',
+              'versionCode': 3,
+              'fromPlay': true,
+              'files': [p.join(oldRoot.path, 'Download/setup.apk')],
+            },
+          ],
+        'readWallpaper' => a['which'] == 'home' ? Uint8List.fromList([1, 2, 3]) : null,
+        'readRingtones' => [
+            {'type': 'ringtone', 'title': 'Song', 'path': p.join(oldRoot.path, 'Music/song.mp3')},
+          ],
+        'isDefaultSmsApp' => defaultSms,
+        'requestDefaultSmsApp' => defaultSms = true,
+        'canWriteSettings' => true,
+        'writeSms' => wrote('sms'),
+        'writeMms' => wrote('mms'),
+        'writeCalls' => wrote('calls'),
+        'writeCalendar' => wrote('calendar'),
+        'setWallpaper' => () {
+            wallpapers.add(a['which'] as String);
+            return true;
+          }(),
+        'setRingtone' => () {
+            ringtones.add(a['path'] as String?);
+            return true;
+          }(),
+        'installedVersion' => -1,
+        _ => null,
+      };
+    };
+    // Every runtime permission is granted.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('flutter.baseflow.com/permissions/methods'), (call) async {
+      if (call.method == 'checkPermissionStatus') return 1;
+      if (call.method == 'requestPermissions') return {for (final x in call.arguments as List) x: 1};
+      return null;
+    });
+
+    final r = await startReceiver();
+    // The user taps "Allow" when the new phone asks (messages need the default-SMS role).
+    final asked = <Extra>[];
+    r.addListener(() {
+      final e = r.pendingPrompt;
+      if (e != null && !asked.contains(e)) {
+        asked.add(e);
+        r.answerPrompt(e, true);
+      }
+    });
+    final (s, base) = await prepareSender(r);
+    currentRoot = oldRoot.path;
+    final x = await ExtrasScan.scan([oldRoot.path]);
+    expect(x.count(Extra.messages), 2);
+    expect(x.apps.single.files.single.rel, 'PhoneClone/Apps/com.example.x/setup.apk');
+    final plan = SendPlan([...base.files, ...x.apps.single.files], const [],
+        extras: Extra.values.toSet(), extrasScan: x);
+
+    await s.run(plan);
+    expect(s.phase, SendPhase.done, reason: '${s.fatalError}');
+    expect(asked, [Extra.messages], reason: 'only what is not yet allowed is asked for');
+    expect(written['calendar'], hasLength(1));
+    expect(written['calls'], hasLength(2));
+    expect(written['sms'], hasLength(2));
+    expect(r.extraTally[Extra.calls]!.added, 2);
+    expect(r.extraTally[Extra.messages]!.added, 2);
+    expect(r.smsRoleToHandBack, isTrue, reason: 'offers to give the SMS role back');
+    expect(s.extraTally[Extra.messages]!.added, 2);
+    expect(s.extraTally[Extra.calendar]!.state, 'done');
+    expect(wallpapers, ['home']);
+    expect(ringtones, [p.join(newRoot.path, 'Music/song.mp3')], reason: 'the copied file becomes the ringtone');
+    expect(r.apps.single.paths.single, p.join(newRoot.path, 'PhoneClone/Apps/com.example.x/setup.apk'));
+    expect(File(r.apps.single.paths.single).readAsBytesSync(), File(p.join(oldRoot.path, 'Download/setup.apk')).readAsBytesSync());
+
+    // Files tab: every chosen file, compared with the new phone.
+    expect(s.outcomes, hasLength(plan.files.length));
+    expect(s.outcomes.values.every((o) => o.onNewPhone), isTrue, reason: '${s.outcomes.values.map((o) => o.status)}');
+    expect(r.sessionFiles.map((f) => f.rel).toSet(), {for (final f in plan.files) f.rel});
+
+    // Again: nothing new; the Files tab shows "already there".
+    await s.run(plan);
+    expect(s.outcomes.values.map((o) => o.status).toSet(), {'already'});
+
+    // A new phone that is still on v4 just skips the extras.
+    s.dispose();
+    await r.stop();
+    ReceiverService.debugProtocolVersion = 4;
+    final r4 = await startReceiver();
+    final (s4, _) = await prepareSender(r4);
+    await s4.run(plan);
+    expect(s4.phase, SendPhase.done);
+    expect(s4.extraTally[Extra.calls]!.state, 'skipped');
+    s4.dispose();
+    await r4.stop();
   });
 }
