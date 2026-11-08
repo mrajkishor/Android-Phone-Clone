@@ -38,6 +38,7 @@
 - [Testing](#-testing)
 - [Project structure](#-project-structure)
 - [Version history](#-version-history)
+- [The Claude effect](#-the-claude-effect-a-totally-scientific-analysis)
 - [FAQ](#-faq)
 - [Troubleshooting](#-troubleshooting)
 - [Known limitations](#-known-limitations)
@@ -535,6 +536,85 @@ gantt
 > **Total hands-on build time: ~1 h 31 min** (v1 + v2 + v3 + repo). The gaps in between were spent discussing requirements and reviewing each version.
 
 Full details: **[CHANGELOG.md](CHANGELOG.md)**
+
+---
+
+## 💸 The Claude effect *(a totally scientific analysis)*
+
+> [!WARNING]
+> Every number below was calculated using the industry-standard methodology known as **"vibes."** No spreadsheets were harmed. Please don't send this to your CFO.
+
+### 🧑‍💻 The team that *would* have built this
+
+| Role | Traditional estimate | Actual |
+|---|---|---|
+| Senior Flutter developer | 6 weeks | 😴 on leave (didn't need to come back) |
+| Android native developer (Kotlin, services, MediaStore) | 2 weeks | 🏖️ still at the beach |
+| Intern | 6 weeks, mostly asking "why is Gradle red?" | 🎓 promoted to *Chief APK Installer* (2 phones, 1 tap each) |
+| QA engineer | 1.5 weeks | 🤖 replaced by 6 tests that pass while you sip chai |
+| Technical writer | 3 days | 📝 this README wrote itself (with help) |
+| Scrum master | 30 stand-ups × 15 min | 🪑 the chair is still warm |
+| **Product owner / boss / visionary** | — | 👑 **[@mrajkishor](https://github.com/mrajkishor), very much employed** |
+
+**Jobs actually lost: 0.** The intern was reassigned to holding both phones during testing, which is honestly the most important job here. 📱🤲📱
+
+### ⏱️ Hours saved
+
+| | Old-school team | With Claude |
+|---|:---:|:---:|
+| v1.0.0 — *It works* | ~80 h | 43 min |
+| v2.0.0 — *It's exact* | ~120 h | 14 min |
+| v3.0.0 — *It's unstoppable* | ~160 h | 16 min |
+| Repo, README, CHANGELOG, release | ~24 h | 18 min |
+| **Total** | **~384 person-hours** (≈ 10 work-weeks) | **~1 h 31 min** |
+
+That's roughly **250× faster**, or, put another way, Claude finished three versions before a typical team would have finished arguing about whether to use `provider` or `riverpod`.
+
+### 💰 Money saved
+
+| Line item | Old-school cost (₹) |
+|---|---:|
+| Senior Flutter dev — 240 h × ₹1,200 | 2,88,000 |
+| Android native dev — 80 h × ₹1,200 | 96,000 |
+| Intern — 240 h × ₹150 | 36,000 |
+| QA — 60 h × ₹600 | 36,000 |
+| Tech writer — 24 h × ₹800 | 19,200 |
+| Chai ☕ (4 people × 2 cups × 50 days × ₹15) | 6,000 |
+| Samosas for "quick sync" meetings 🥟 | 4,500 |
+| Emergency pizza on release night 🍕 | 3,200 |
+| **Total** | **≈ ₹4,89,000** *(≈ US$ 5,800)* |
+| **Actual cost** | **One Claude subscription and a bit of patience** |
+
+### 📊 Where those 10 weeks would *really* have gone
+
+```mermaid
+pie showData
+    title Where 384 hours of traditional dev time goes
+    "Actually writing code" : 96
+    "Fighting Gradle & Android SDK versions" : 72
+    "Meetings that could have been an email" : 58
+    "Searching Stack Overflow" : 50
+    "Waiting for builds" : 40
+    "Chai & samosa breaks" : 38
+    "Asking 'works on my phone?'" : 30
+```
+
+### 🏆 Fun facts from this build
+
+| Stat | Value |
+|---|---|
+| Lines committed in the first push | ~5,200 |
+| Versions shipped in one afternoon | 3 |
+| Gradle build failures defeated | 6 *(Maven rate limit, SDK mismatch, plugin APIs, out of memory… we've seen things)* |
+| End-to-end tests | 6, all passing — every time |
+| Merge conflicts | 0 |
+| Jira tickets created | 0 |
+| "Can you hop on a quick call?" | 0 |
+| Times a human said *"Is it possible?"* and the answer was yes | Many |
+| Chai consumed by Claude | 0 (it's a language model; it's sad about this) |
+
+> [!NOTE]
+> **The honest bit:** a human still made every decision that mattered — what to build, what "done" means, what to fix next — and the app still needs testing on real phones by real people. Claude just did the typing. Very, *very* fast typing. ⚡
 
 ---
 
