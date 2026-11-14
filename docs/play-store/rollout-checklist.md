@@ -29,11 +29,11 @@ The build, key and listing assets are already done; what's left is backups and f
 - [x] Privacy policy (`PRIVACY.md`), store listing text, 512×512 icon, 1024×500 feature graphic
 - [x] Release `.aab` for 4.2.2 (version code 8) built and verified
 - [ ] **You:** back up the upload key and passwords in a password manager + one offline copy
-- [ ] **You:** host the privacy policy at a public URL (e.g. the GitHub page of `PRIVACY.md`) and note the link
+- [x] Privacy policy at a public URL: <https://github.com/mrajkishor/Android-Phone-Clone/blob/main/PRIVACY.md> (checked: loads without sign-in)
 - [ ] **You:** create a support email address for the listing (or use your own)
-- [ ] **You:** start collecting **12+ testers' Gmail addresses** now (friends, family, colleagues); aim for 15 so a drop-out doesn't reset the clock
+- [ ] **You:** start collecting **12+ testers' Gmail addresses** now (friends, family, colleagues); aim for 15 so a drop-out doesn't reset the clock. Ready-to-send invite: [`tester-invite.md`](tester-invite.md). Keep the addresses out of this public repo.
 - [ ] **You:** keep two Android phones ready for testing and for recording the permission videos
-- [ ] **Claude:** set up GitHub Actions to build, sign and upload to Play (switched off until the account and secrets exist)
+- [x] **Claude:** GitHub Actions workflow to build, sign and upload to Play: [`.github/workflows/play-upload.yml`](../../.github/workflows/play-upload.yml). Runs only when started by hand (or a `play-v*` tag) and stops with a clear message until the secrets exist
 
 ## Phase 1 · Developer account and app (1 hour + 1–7 days verification)
 
@@ -46,8 +46,8 @@ Only you can do this phase: Google verifies you as a person.
 - [ ] **You:** Create app → name **PhoneHop** → default language English (India or US) → **App** → **Free** → accept the declarations
 - [ ] **You:** keep **Play App Signing** on the default (Google holds the app signing key; your upload key signs uploads)
 - [ ] **You:** Google Cloud: create a **service account**, then in Play Console → Users and permissions, invite it with *Release* rights; save its JSON key
-- [ ] **You:** add three GitHub secrets: the service-account JSON, the upload key (base64) and `key.properties` values
-- [ ] **Claude:** switch on the upload workflow and do a test upload to the **internal** track
+- [ ] **You:** add five GitHub secrets (Settings → Secrets and variables → Actions): `PLAY_SERVICE_ACCOUNT_JSON`, `UPLOAD_KEYSTORE_BASE64` (`base64 -w0 phone-clone-upload.jks`), `UPLOAD_STORE_PASSWORD`, `UPLOAD_KEY_PASSWORD`, `UPLOAD_KEY_ALIAS`
+- [ ] **Claude:** run *Upload to Google Play* with ref `1b57aa6` (4.2.2), track `internal`, status `draft`
 
 ## Phase 2 · Store listing and policy forms (1–2 days)
 

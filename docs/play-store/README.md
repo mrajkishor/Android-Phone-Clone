@@ -24,7 +24,7 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 - [x] Release `.aab` built and verified (signed with the upload key, version 4.2.2 / code 8; build it from tag `v4.2.2`)
 
 > [!TIP]
-> **Full step-by-step checklist with a roadmap:** [`rollout-checklist.md`](rollout-checklist.md) (account → policy forms → internal → 12-tester closed test → production → after launch, plus CI/CD and maintenance).
+> **Full step-by-step checklist with a roadmap:** [`rollout-checklist.md`](rollout-checklist.md) (account → policy forms → internal → 12-tester closed test → production → after launch, plus CI/CD and maintenance). Tester invite: [`tester-invite.md`](tester-invite.md). Upload workflow: [`play-upload.yml`](../../.github/workflows/play-upload.yml).
 
 ## 🧭 When you're ready to launch (your steps)
 
