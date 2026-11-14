@@ -23,6 +23,9 @@ Everything needed before and during the Google Play launch. **Nothing here has b
 - [x] Ready-to-paste answers for All files access, foreground service, Data safety and other forms → [`declarations.md`](declarations.md)
 - [x] Release `.aab` built and verified (signed with the upload key, version 4.2.2 / code 8; build it from tag `v4.2.2`)
 
+> [!TIP]
+> **Full step-by-step checklist with a roadmap:** [`rollout-checklist.md`](rollout-checklist.md) (account → policy forms → internal → 12-tester closed test → production → after launch, plus CI/CD and maintenance).
+
 ## 🧭 When you're ready to launch (your steps)
 
 > [!IMPORTANT]

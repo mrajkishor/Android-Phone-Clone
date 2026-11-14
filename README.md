@@ -711,7 +711,9 @@ flutter build apk --release  # → build/app/outputs/flutter-apk/app-release.apk
 | compileSdk / targetSdk / minSdk | 37 / 36 / 24 |
 | Java | 21 |
 
-The release APK is signed with the debug key, which is fine for sideloading. Set up your own keystore before publishing anywhere. Google Play reviews apps that use *All files access*; device-to-device transfer is one of its permitted uses.
+Release builds are signed with the upload key from `android/key.properties` (never committed; without it the build falls back to the debug key, fine for sideloading). Google Play reviews apps that use *All files access*; device-to-device transfer is one of its permitted uses.
+
+**Publishing to Google Play:** follow the step-by-step [production rollout checklist](docs/play-store/rollout-checklist.md) (account, policy forms, internal and closed testing, production, CI/CD and maintenance). The listing text, declarations and graphics are in [`docs/play-store/`](docs/play-store/).
 
 </details>
 
